@@ -531,8 +531,8 @@ everything tried so far):
 
 ## H. PRIOR ART ON DISK: hakuX and x1box (2026-09-12)
 
-`$HOME/projects/hakuX` (github.com/rfandango/hakuX) and
-`$HOME/projects/x1box/xemu` are **separate Xbox-on-Android
+hakuX (github.com/rfandango/hakuX) and
+x1box's xemu fork are **separate Xbox-on-Android
 projects of the same lineage**, not forks of ours.  Both carry substantial TCG
 work we do not have -- identical line counts, so they share a patched
 ancestor:

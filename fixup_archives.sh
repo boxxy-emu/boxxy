@@ -25,7 +25,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$SCRIPT_DIR/build"
-NDK_PATH='$HOME/Library/Android/sdk/ndk/29.0.14206865'
+NDK_PATH="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}"
 LLVM_AR="$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
 
 # ── Sanity checks ─────────────────────────────────────────────────────────────

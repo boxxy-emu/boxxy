@@ -19,9 +19,9 @@ Inputs, all from the SAME run (JIT addresses differ between runs):
   halo_sections.json  from xbe-sections.py
   simpleperf dump text  (record with --app, not -p; shell cannot attach by pid)
 """
-import bisect, collections, json, re, struct, sys
+import bisect, collections, json, os, re, struct, sys
 
-D = "$HOME/.claude/jobs/16b69e39/tmp"
+D = os.environ.get("XBE_WORK", "/tmp")
 
 def load_guestmap(p):
     b = open(p, 'rb').read(); assert b[:5] == b'XGPC1', 'bad magic'

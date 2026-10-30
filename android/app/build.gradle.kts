@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// vcpkg checkout with the arm64-android packages (CLAUDE.md, "vcpkg Dependencies")
+val vcpkgRoot: String = System.getenv("VCPKG_ROOT")
+    ?: "${System.getProperty("user.home")}/projects/vcpkg"
+
 android {
     namespace = "com.boxxy"
     compileSdk = 34
@@ -28,7 +32,7 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17")
-                arguments("-DANDROID_STL=c++_shared", "-DVCPKG_ROOT=$HOME/projects/vcpkg")
+                arguments("-DANDROID_STL=c++_shared", "-DVCPKG_ROOT=$vcpkgRoot")
             }
         }
     }

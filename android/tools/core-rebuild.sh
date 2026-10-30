@@ -19,7 +19,7 @@ set -u
 MODE=${1:-use}
 ROOT=${0:A:h:h:h}
 cd $ROOT
-NDK=$HOME/Library/Android/sdk/ndk/29.0.14206865
+NDK=${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}
 B=$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin
 export ANDROID_NDK_ROOT=$NDK PATH="$B:$PATH"
 LOG=build/core-rebuild.log

@@ -101,7 +101,7 @@ CMake links `libqemu-i386-softmmu.a` (a regular static archive). After editing a
 ninja -C build libqemu-i386-softmmu.a
 
 # Step 2: replace the thin archive with a slim regular archive (own objects only)
-NDK_PATH='$HOME/Library/Android/sdk/ndk/29.0.14206865'
+NDK_PATH="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}"
 LLVM_AR="$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
 rm -f build/libqemu-i386-softmmu.a
 "$LLVM_AR" rcs build/libqemu-i386-softmmu.a build/libqemu-i386-softmmu.a.p/*.o
@@ -177,7 +177,7 @@ The slim-archive `llvm-ar rcs` procedure above applies **ONLY to `libqemu-i386-s
 After running `ninja -C build` and rebuilding as a regular archive from the ninja rule objects, the following objects **must be removed** with `llvm-ar d` to prevent linker errors and runtime QOM crashes. These objects are either non-Xbox platform code with missing Android dependencies, CMake-compiled duplicates, or QOM types whose parent/interface types were removed:
 
 ```bash
-NDK=$HOME/Library/Android/sdk/ndk/29.0.14206865
+NDK="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}"
 LLVM_AR=$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar
 
 # ── CMake-compiled files (double-register their QOM types) ───────────────────
@@ -398,7 +398,7 @@ NativeInterface.startEmulation() [JNI, NativeInterface.cpp]
 
 ## vcpkg Dependencies (arm64-android triplet)
 
-Located at `$HOME/projects/vcpkg/installed/arm64-android/`. Key packages: `glib`, `pixman`, `libepoxy`, `SDL3`, `openssl`, `zlib`, `libpng`, `libsamplerate`.
+Located at `$VCPKG_ROOT/installed/arm64-android/` (`VCPKG_ROOT` defaults to `~/projects/vcpkg`; Gradle and `rebuild_meson.sh` read it, and the NDK from `ANDROID_NDK_HOME`). Key packages: `glib`, `pixman`, `libepoxy`, `SDL3`, `openssl`, `zlib`, `libpng`, `libsamplerate`.
 
 The `pkg-config` path must be set to the vcpkg pkgconfig dir when running Meson (handled by `android_arm64.txt` `[properties]` section).
 
@@ -406,7 +406,7 @@ The `pkg-config` path must be set to the vcpkg pkgconfig dir when running Meson 
 
 Some vcpkg packages need project-specific patches (e.g. NEON-optimizing a hot audio
 path). These live in `vcpkg-overlay-ports/<port>/` **inside this repo** — never edit
-files directly under the vcpkg checkout itself (e.g. `$HOME/projects/vcpkg/ports/...`).
+files directly under the vcpkg checkout itself (e.g. `$VCPKG_ROOT/ports/...`).
 That checkout is a plain, unmodified clone of upstream `microsoft/vcpkg` and should stay
 that way: no fork to maintain, and the patch travels with this repo for anyone who
 clones it against their own stock vcpkg checkout.
@@ -414,11 +414,11 @@ clones it against their own stock vcpkg checkout.
 To (re)install a patched package, pass the overlay dir explicitly:
 
 ```bash
-export ANDROID_NDK_HOME='$HOME/Library/Android/sdk/ndk/29.0.14206865'  # needed for vcpkg's compiler detection
-cd $HOME/projects/vcpkg
+export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}"  # needed for vcpkg's compiler detection
+cd "$VCPKG_ROOT"
 ./vcpkg remove <port>:arm64-android
 ./vcpkg install <port>:arm64-android --recurse --no-binarycaching \
-    --overlay-ports=$HOME/projects/xemu/vcpkg-overlay-ports
+    --overlay-ports="$XEMU_ROOT/vcpkg-overlay-ports"   # this repo
 ```
 
 Reinstalling a package **without** `--overlay-ports` silently drops back to the

@@ -1,5 +1,7 @@
+# ndk_path and vcpkg_root come from build/android_paths.txt, which
+# rebuild_meson.sh writes from $ANDROID_NDK_HOME and $VCPKG_ROOT and passes as
+# the first cross file (Meson lets a later cross file use its constants).
 [constants]
-ndk_path = '$HOME/Library/Android/sdk/ndk/29.0.14206865'
 toolchain = ndk_path + '/toolchains/llvm/prebuilt/darwin-x86_64/bin/'
 api = '28'
 
@@ -27,7 +29,7 @@ cpu = 'armv8-a'
 endian = 'little'
 
 [properties]
-pkg_config_libdir = '$HOME/projects/vcpkg/installed/arm64-android/lib/pkgconfig:$HOME/projects/vcpkg/installed/arm64-android/share/pkgconfig'
+pkg_config_libdir = vcpkg_root + '/installed/arm64-android/lib/pkgconfig:' + vcpkg_root + '/installed/arm64-android/share/pkgconfig'
 cmake_system_name = 'Android'
 cmake_android_ndk = ndk_path
 cmake_android_arch_abi = 'arm64-v8a'

@@ -1,6 +1,6 @@
 # Add this at the very top to integrate vcpkg without triggering the AGP sysroot bug
 set(VCPKG_TARGET_TRIPLET "arm64-android")
-include("$HOME/projects/vcpkg/scripts/buildsystems/vcpkg.cmake")
+include("${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
 
 cmake_minimum_required(VERSION 3.22.1)
 
@@ -238,3 +238,15 @@ target_link_libraries(xemu
     -latomic
     $<$<BOOL:${HAVE_ADRENOTOOLS}>:adrenotools>
 )
+
+# Compilers record source paths in the library (assertion messages, Rust panic
+# locations, glib's install dirs), and on a build machine those start with the
+# builder's home directory.  Replace it in place, before Gradle strips the
+# library, and fail the build if the user name is still there.
+# libslirp.so (Meson's subproject, packaged next to it) carries glib's too.
+add_custom_command(TARGET xemu POST_BUILD
+    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../../../../tools/scrub-build-paths.py
+            $<TARGET_FILE:xemu> "$ENV{HOME}"
+    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../../../../tools/scrub-build-paths.py
+            ${XEMU_ROOT}/build/subprojects/slirp/libslirp.so "$ENV{HOME}"
+    VERBATIM)

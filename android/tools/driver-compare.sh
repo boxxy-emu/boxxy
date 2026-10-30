@@ -4,10 +4,10 @@
 # The metric that decides fps is `vcpu ms/frame` from the emulator's own
 # instrumentation -- NOT average fps (section: Halo paces its own engine).
 # Driver CPU shows up in total process CPU, which is the thermal question.
-ADB="$HOME/Library/Android/sdk/platform-tools/adb"; DEV=<device-ip>:5555
+ADB="$HOME/Library/Android/sdk/platform-tools/adb"; DEV=${DEV:?set DEV to the Thor adb address, e.g. DEV=<ip>:5555}
 adb() { "$ADB" -s $DEV "$@"; }
 FRAMES=1200
-OUT=$HOME/.claude/jobs/16b69e39/tmp/turnip_results.txt
+OUT=${OUT:-${TMPDIR:-/tmp}/turnip_results.txt}
 
 set_driver() {   # $1 = zip basename, or "none"
   adb shell am force-stop com.boxxy; sleep 2

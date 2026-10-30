@@ -15,8 +15,8 @@
 set -u
 ROOT=${0:A:h:h:h}
 ADB=~/Library/Android/sdk/platform-tools/adb
-DEV=${DEV:-<device-ip>:5555}
-B=$HOME/Library/Android/sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/darwin-x86_64/bin
+DEV=${DEV:?set DEV to the Thor adb address, e.g. DEV=<ip>:5555}
+B=${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}/toolchains/llvm/prebuilt/darwin-x86_64/bin
 OUT=$ROOT/build/pgo-raw
 a(){ $ADB -s $DEV "$@"; }
 launch(){  # x y: tap a library card on the lower screen

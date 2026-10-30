@@ -12,7 +12,7 @@
 #
 # Usage: panel-idle-ab.sh [rounds=4] [slot=7]
 set -u
-ADB="$HOME/Library/Android/sdk/platform-tools/adb -s ${ADB_SERIAL:-<device-ip>:5555}"
+ADB="$HOME/Library/Android/sdk/platform-tools/adb -s ${ADB_SERIAL:?set ADB_SERIAL to the Thor adb address}"
 ROUNDS=${1:-4}
 SLOT=${2:-7}
 WARM=${WARM:-20}

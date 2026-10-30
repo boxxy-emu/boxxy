@@ -1,7 +1,8 @@
 """Dump XBE section VIRTUAL address ranges, so a guest PC can be attributed
 to the library it belongs to (.text = game, D3D/DSOUND/... = Xbox libraries)."""
-import sys; sys.argv=[sys.argv[0]]
-exec(open("$HOME/.claude/jobs/16b69e39/tmp/xiso.py").read())
+import os, sys; sys.argv=[sys.argv[0]]
+D = os.environ.get("XBE_WORK", "/tmp")
+exec(open(f"{D}/xiso.py").read())
 import struct, json
 
 def section_vas(path):
@@ -28,4 +29,4 @@ if __name__ == "__main__":
     for d in secs:
         if d['vsize']==0: continue
         print(f"{d['name']:<14}0x{d['va']:08X} 0x{d['va']+d['vsize']:08X} {d['vsize']/1024:7.1f}")
-    json.dump(secs, open("$HOME/.claude/jobs/16b69e39/tmp/halo_sections.json","w"))
+    json.dump(secs, open(f"{D}/halo_sections.json","w"))

@@ -1,5 +1,6 @@
 #!/bin/bash
-export NDK_PATH='$HOME/Library/Android/sdk/ndk/29.0.14206865'
+export NDK_PATH="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}"
+VCPKG_ROOT="${VCPKG_ROOT:-$HOME/projects/vcpkg}"
 export TOOLCHAIN="$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin"
 export ANDROID_NDK_ROOT="$NDK_PATH"
 
@@ -9,6 +10,13 @@ export PATH="$TOOLCHAIN:$PATH"
 # Clean build directory
 rm -rf build/
 mkdir build
+
+# Machine-specific paths for the cross file (android_arm64.txt)
+cat > build/android_paths.txt <<EOF
+[constants]
+ndk_path = '$NDK_PATH'
+vcpkg_root = '$VCPKG_ROOT'
+EOF
 
 # Generate minimal config-host.mak required by meson.build
 cat > build/config-host.mak <<EOF
@@ -38,6 +46,7 @@ EOF
 
 # Use the cross-file which now includes both Android and Native (FOR_BUILD) settings
 meson setup build \
+    --cross-file build/android_paths.txt \
     --cross-file android_arm64.txt \
     --buildtype=release \
     -Dguest_agent=disabled \

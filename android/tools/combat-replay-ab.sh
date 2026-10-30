@@ -2,9 +2,10 @@
 # Deterministic heavy-combat A/B: identical save state + identical replayed
 # input under each config.  This is the harness section AL said was missing --
 # slot 5 alone lets the guest idle, so savings vanish into the clock spin.
-adb() { "$HOME/Library/Android/sdk/platform-tools/adb" -s <device-ip>:5555 "$@"; }
+DEV=${DEV:?set DEV to the Thor adb address, e.g. DEV=<ip>:5555}
+adb() { "$HOME/Library/Android/sdk/platform-tools/adb" -s "$DEV" "$@"; }
 SLOT="${SLOT:-5}"; REC="${REC:-combat2}"; FRAMES="${FRAMES:-800}"
-OUT=$HOME/.claude/jobs/16b69e39/tmp/replay_results.txt
+OUT=${OUT:-${TMPDIR:-/tmp}/replay_results.txt}
 run() {
   adb shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1
   adb shell setprop debug.xemu.ldapr $1

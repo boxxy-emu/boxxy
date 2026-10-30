@@ -11,7 +11,7 @@
 # The busiest thread is the vCPU (~68% of process cycles in every profile
 # taken here).  Validated against our own benchmark: this reports 96% busiest
 # where the in-process benchmark reported 98% util.
-ADB="$HOME/Library/Android/sdk/platform-tools/adb"; DEV=<device-ip>:5555
+ADB="$HOME/Library/Android/sdk/platform-tools/adb"; DEV=${DEV:?set DEV to the Thor adb address, e.g. DEV=<ip>:5555}
 PKG="$1"; SECS="${2:-15}"
 PID=$($ADB -s $DEV shell "pidof $PKG" | tr -d '\r' | awk '{print $1}')
 [ -z "$PID" ] && { echo "  $PKG NOT RUNNING"; exit 1; }

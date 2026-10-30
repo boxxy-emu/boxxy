@@ -10,7 +10,7 @@
 # the health pack ENDS it.  To measure the dip itself: recording "none",
 # SETTLE=1.5 -- past the two one-off reload hitches, inside the effect.
 set -u
-ADB="$HOME/Library/Android/sdk/platform-tools/adb -s ${ADB_SERIAL:-<device-ip>:5555}"
+ADB="$HOME/Library/Android/sdk/platform-tools/adb -s ${ADB_SERIAL:?set ADB_SERIAL to the Thor adb address}"
 OUT=$1; SLOT=${2:-7}; REC=${3:-walk_fps_dip}; FRAMES=${4:-400}
 
 $ADB shell input keyevent KEYCODE_WAKEUP
