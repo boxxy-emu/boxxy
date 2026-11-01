@@ -182,6 +182,21 @@ object ArtworkRepository {
             .flatMap { d -> d.supportedModes.map { maxOf(it.physicalWidth, it.physicalHeight) } }
             .maxOrNull() ?: 1920
 
+    /** Short edge of the largest display (1080 on the Thor). */
+    private fun screenShortEdge(context: Context): Int =
+        context.getSystemService(DisplayManager::class.java).displays
+            .flatMap { d -> d.supportedModes.map { minOf(it.physicalWidth, it.physicalHeight) } }
+            .maxOrNull() ?: 1080
+
+    /** Downloaded cover: no card is taller than the screen's short edge, and
+     *  cards are portrait, so 2:3 of that bounds the width (720x1080 on the
+     *  Thor, which keeps SteamGridDB's 600x900).  Most arrive as PNG, 0.6-1.5
+     *  MB, decoding ~4x slower than the JPEG they become. */
+    fun shrinkCover(context: Context, file: File): Boolean {
+        val edge = screenShortEdge(context)
+        return shrinkArt(file, edge * 2 / 3, edge)
+    }
+
     /** Hero: as wide as the screen.  SteamGridDB serves many at 3840x1240
      *  PNG, ~5 MB, which took 100+ ms to decode on every launch. */
     fun shrinkHero(context: Context, file: File): Boolean =
@@ -243,14 +258,17 @@ object ArtworkRepository {
         false
     }
 
-    /** Shrinks heroes and logos cached before they were sized on download.
-     *  Reads only image headers for those already done, so it is cheap to
-     *  run on every launch. */
+    /** Shrinks downloaded art cached before it was sized on download.
+     *  Reads only image headers for files already done, so it is cheap to
+     *  run on every launch.  Custom and disc art are left as they are. */
     fun shrinkCachedArt(context: Context) {
-        artworkDir(context).listFiles { f -> f.name.endsWith(".img") }?.forEach {
+        artworkDir(context).listFiles()?.forEach {
+            val n = it.name
             when {
-                it.name.startsWith("hero_") -> shrinkHero(context, it)
-                it.name.startsWith("logo_") -> shrinkLogo(context, it)
+                n.startsWith("hero_") && n.endsWith(".img") -> shrinkHero(context, it)
+                n.startsWith("logo_") && n.endsWith(".img") -> shrinkLogo(context, it)
+                n.endsWith(".jpg") && !n.startsWith("custom_") && !n.startsWith("disc_") ->
+                    shrinkCover(context, it)
             }
         }
     }
@@ -302,7 +320,7 @@ object ArtworkRepository {
         when (val found = fetchFromSteamGridDB(displayName, steamGridDbKey)) {
             is Lookup.Url ->
                 downloadTo(found.url, dest)
-                    ?.let { ArtOutcome.Found(it) }
+                    ?.let { shrinkCover(context, it); ArtOutcome.Found(it) }
                     ?: ArtOutcome.Unreachable
             Lookup.Rejected -> ArtOutcome.KeyRejected
             Lookup.NoMatch -> {

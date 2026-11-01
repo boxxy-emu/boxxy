@@ -5333,3 +5333,8 @@ after `cmd package compile -m speed-profile -f`.
   band: 692x298 max on the Thor; the fractions are shared constants in
   GameShowcase), as lossy WebP (they have alpha).  They came as large as
   6224x752 PNG, 3.8 MB -> 23 KB.  All launch decodes now 21-38 ms.
+- **Covers re-encoded as JPEG: 14-47 -> 6-7 ms.** SteamGridDB's 600x900 is
+  the right size (bound: the screen's short edge tall, 2:3 of it wide, 720x1080
+  on the Thor), but 5 of 6 arrived as PNG (0.6-1.5 MB, under a .jpg name):
+  now ~130-155 KB JPEG.  With heroes and logos, every image decoded at launch
+  finishes by ~540 ms (debug build) vs ~575-600 before.
