@@ -5314,3 +5314,10 @@ after `cmd package compile -m speed-profile -f`.
   window lays out a frame later (169-219 ms) and TotalTime waits for it.
   Hero art decodes off-thread until ~250 ms: the hero is decoded twice at full
   size (sharp band + 32 dp-blurred backdrop).
+- **Backdrop decoded at 480x270: memory, not time.** The hero is a 3840x1240
+  PNG (5 MB); PNG has no partial decode, so asking for a small size still
+  inflates the whole file.  Hero decodes 85-170 -> 110-127 ms (within noise,
+  4 launches each, atrace decodeBitmap).  Kept: the backdrop bitmap is 0.3 MB
+  instead of ~19 MB and looks the same under the 32 dp blur.  The decode cost
+  is in the file itself: storing heroes at screen size (1920 wide) would be
+  the fix.

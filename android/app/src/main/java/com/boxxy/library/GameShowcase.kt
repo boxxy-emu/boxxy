@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -29,10 +30,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 
 /** Native shape of a SteamGridDB hero (1920x620, 3840x1240). */
 private const val HERO_ASPECT = 1920f / 620f
+
+/* Decode size of the blurred backdrop (see where it is drawn). */
+private const val BACKDROP_W = 480
+private const val BACKDROP_H = 270
 
 /* A light scrim over the blurred backdrop only; the legibility darkening is
  * one gradient over everything (see [shade]), so no part of the screen is a
@@ -90,8 +97,16 @@ fun GameShowcase(
             val backdrop = if (dim > 0f) null
                            else g.heroUri ?: g.coverUri?.takeIf { !g.coverIsDiscArt }
             if (backdrop != null) {
+                /* Decoded small: it is blurred by 32 dp, so detail beyond about
+                 * a quarter of the screen never shows.  At full size this was a
+                 * second decode of a 3840-wide hero alongside the sharp one,
+                 * delaying the art on every launch. */
+                val context = LocalContext.current
+                val request = remember(backdrop) {
+                    ImageRequest.Builder(context).data(backdrop).size(BACKDROP_W, BACKDROP_H).build()
+                }
                 AsyncImage(
-                    model = backdrop, contentDescription = null,
+                    model = request, contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().blur(32.dp),
                 )
