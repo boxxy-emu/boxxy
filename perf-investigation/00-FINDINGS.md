@@ -5351,3 +5351,13 @@ after `cmd package compile -m speed-profile -f`.
   warm-up -- read 310 vs 245 for the same pair: use ab.sh.)
 - **Current (2026-10-31, after the art changes): 163 ms speed-profile, 182 ms
   fresh install; Dolphin 115.**
+- **Dead end: an app baseline profile.**  Ceiling test, F build, 6 launches
+  each, Dolphin control: speed-profile 162 ms, full AOT `compile -m speed`
+  164 ms, speed-profile again 159.  Compiling everything is no faster than
+  the usage profile, so no baseline profile can beat it; the APK already
+  carries the libraries' merged profile (assets/dexopt/baseline.prof).  The
+  fresh-install figure (182) is uncompiled `verify` state, which a sideloaded
+  APK keeps until bg-dexopt -- and that pass compiles from the usage profile
+  anyway.  A profile would only help Play installs.  What remains is real
+  first-frame work (Compose composition, the showcase's first draw), not code
+  compilation.
