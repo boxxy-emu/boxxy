@@ -5338,3 +5338,16 @@ after `cmd package compile -m speed-profile -f`.
   on the Thor), but 5 of 6 arrived as PNG (0.6-1.5 MB, under a .jpg name):
   now ~130-155 KB JPEG.  With heroes and logos, every image decoded at launch
   finishes by ~540 ms (debug build) vs ~575-600 before.
+- **Dead end: lower-screen window in the same frame as the top.** Showing the
+  dual-screen Presentation from a Choreographer frame callback (before the
+  first traversal) does put both windows' first layout in one frame, but the
+  main thread then blocks ~80 ms inside it: the app has one RenderThread, busy
+  with the top window's first draw (EGL context + surface setup), and the new
+  window's renderer setup waits on it.  ab.sh, 6 launches each, Dolphin as
+  control: 191 ms (speed-profile) / 230 (fresh) vs 163 / 182 without.
+  Reverted.  The two windows' first draws are serial on the RenderThread
+  either way; the old order at least leaves the main thread free meanwhile.
+  (A quick check of 3-4 launches right after `cmd package compile` -- no ab.sh
+  warm-up -- read 310 vs 245 for the same pair: use ab.sh.)
+- **Current (2026-10-31, after the art changes): 163 ms speed-profile, 182 ms
+  fresh install; Dolphin 115.**
