@@ -3,6 +3,7 @@ package com.boxxy
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.view.animation.DecelerateInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -147,6 +148,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         maybeRelaunchGame(intent)
         maybeAutoLaunch()
+        // Hand-off from the splash: the cube swells and fades while the splash
+        // dissolves into the library beneath.  It starts once the first frame
+        // is ready, so it adds nothing to launch time.
+        splashScreen.setOnExitAnimationListener { splash ->
+            splash.iconView?.animate()
+                ?.scaleX(1.15f)?.scaleY(1.15f)?.alpha(0f)
+                ?.setDuration(SPLASH_EXIT_MS)
+                ?.setInterpolator(DecelerateInterpolator())
+                ?.start()
+            splash.animate()
+                .alpha(0f)
+                .setDuration(SPLASH_EXIT_MS)
+                .setInterpolator(DecelerateInterpolator())
+                .withEndAction { splash.remove() }
+                .start()
+        }
         // "Fully drawn" = the game cards are on screen.  The system logs the
         // time from launch ("Fully drawn com.boxxy/.MainActivity: +NNNms"),
         // which is how cold-launch time to content is measured.
@@ -203,6 +220,8 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        private const val SPLASH_EXIT_MS = 250L
+
         /**
          * Copies a content URI to a file in internal storage and returns the
          * absolute path. Used for small system files (MCPX, BIOS).

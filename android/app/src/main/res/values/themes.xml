@@ -18,6 +18,11 @@
         <item name="colorSurface">@color/xemu_surface</item>
         <item name="materialAlertDialogTheme">@style/Theme.Xemu.Dialog</item>
         <item name="alertDialogTheme">@style/Theme.Xemu.Dialog</item>
+        <!-- Launch: the bare cube on the library's own background, so the
+             splash and the first frame read as one surface.  MainActivity
+             animates it away (see onCreate). -->
+        <item name="android:windowSplashScreenBackground">@color/xemu_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
     </style>
 
     <!-- Dialogs sit over a running game, so they follow the dark surface. -->

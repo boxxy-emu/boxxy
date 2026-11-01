@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icon ground: near-black with a cool lift toward the upper left, so the mark
+     still separates on a black-themed launcher. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0 H108 V108 H0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="38"
+                android:centerY="30"
+                android:gradientRadius="92">
+                <item android:offset="0" android:color="#FF262A3D" />
+                <item android:offset="1" android:color="#FF0A0B10" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

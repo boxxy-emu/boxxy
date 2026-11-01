@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Icon ground: the app background, not pure black, so the mark
-         still separates on a black-themed launcher. -->
-    <color name="ic_launcher_background">#121212</color>
     <color name="xbox_green">#FF107C10</color>
     <color name="xbox_green_dark">#FF0A5E0A</color>
     <color name="xbox_green_light">#FF52B043</color>

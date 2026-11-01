@@ -1,35 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Boxxy's mark: an isometric box.
+    Boxxy's mark: a box drawn as a glowing outline.
 
     The name is the console reduced to the thing everyone called it, so the icon
-    is the box itself rather than anything borrowed from Xbox's own identity —
-    no sphere, no X, no green nebula.  Three flat faces in the app's greens give
-    depth without detail, which is what survives being scaled to 48dp in a
-    launcher and then masked to a circle, squircle or rounded square.
+    is the box itself rather than anything borrowed from Xbox's own identity:
+    no sphere, no X.  A lime-to-green line on the dark ground of the library
+    screen, so the icon and the first thing the app shows look like one object.
 
-    Drawn in the 108dp adaptive viewport; the cube spans x 28..80 and y 23..85,
-    inside the central 72dp the system guarantees will never be masked away.
+    Drawn in the 108dp adaptive viewport.  The hexagon has radius 26 around the
+    centre; with the stroke it stays inside the 66dp circle every launcher mask
+    keeps.  The stroke is heavy (4.5) on purpose: at 48dp a thin line greys out.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Top face: lightest, reads as the lit surface -->
+    <!-- Top face, faintly lit, so the box reads as solid rather than wireframe -->
     <path
-        android:pathData="M54,23 L80,38 L54,53 L28,38 Z"
-        android:fillColor="#52B043" />
+        android:pathData="M54,28 L76.52,41 L54,54 L31.48,41 Z"
+        android:fillColor="#1F9BFF3A" />
 
-    <!-- Left face: the mid tone, the app's primary green -->
+    <!-- Halo: the same lines three times, wider and fainter outward, standing in
+         for a glow (a vector cannot blur; one wide band reads as a hard outline) -->
     <path
-        android:pathData="M28,38 L54,53 L54,85 L28,70 Z"
-        android:fillColor="#107C10" />
+        android:pathData="M54,28 L76.52,41 L76.52,67 L54,80 L31.48,67 L31.48,41 Z M31.48,41 L54,54 L76.52,41 M54,54 L54,80"
+        android:strokeWidth="15"
+        android:strokeColor="#0B41F062"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,28 L76.52,41 L76.52,67 L54,80 L31.48,67 L31.48,41 Z M31.48,41 L54,54 L76.52,41 M54,54 L54,80"
+        android:strokeWidth="11"
+        android:strokeColor="#0F41F062"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M54,28 L76.52,41 L76.52,67 L54,80 L31.48,67 L31.48,41 Z M31.48,41 L54,54 L76.52,41 M54,54 L54,80"
+        android:strokeWidth="7.5"
+        android:strokeColor="#1741F062"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
 
-    <!-- Right face: darkest, so the vertical edge between the two faces
-         carries the silhouette even against a dark ground -->
+    <!-- The box: outline, then the near corner's three edges -->
     <path
-        android:pathData="M80,38 L80,70 L54,85 L54,53 Z"
-        android:fillColor="#0A5E0A" />
+        android:pathData="M54,28 L76.52,41 L76.52,67 L54,80 L31.48,67 L31.48,41 Z M31.48,41 L54,54 L76.52,41 M54,54 L54,80"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="76"
+                android:startY="28"
+                android:endX="32"
+                android:endY="80">
+                <item android:offset="0" android:color="#FFD2FF3C" />
+                <item android:offset="0.55" android:color="#FF6CF04A" />
+                <item android:offset="1" android:color="#FF1FDB5C" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>
