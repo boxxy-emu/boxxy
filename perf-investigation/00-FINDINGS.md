@@ -5361,3 +5361,12 @@ after `cmd package compile -m speed-profile -f`.
   anyway.  A profile would only help Play installs.  What remains is real
   first-frame work (Compose composition, the showcase's first draw), not code
   compilation.
+- **Tap to settled, filmed (screenrecord, frame diff vs the final frame,
+  3 launches each).**  Boxxy release 365-400 ms; DuckStation 385; Dolphin
+  417-467; Boxxy debug 767 (the splash waits ~450 ms for a debuggable app's
+  first frame, then the 250 ms exit animation).  Without the custom exit
+  animation the release build took 466-468 ms: the platform's default splash
+  exit is longer than ours, so it stays.  The slow splash users see on a
+  debug build is the build type, not the app.  (The native layer is -O2 in
+  both build types, so gameplay is unaffected.)  Beware the Thor's OLED
+  "anti-image-retention pixel refresh": it ran during one recording.
