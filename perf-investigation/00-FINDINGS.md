@@ -5328,3 +5328,8 @@ after `cmd package compile -m speed-profile -f`.
   older ones by a pass 5 s after launch.  Halo 3840x1240 PNG 5.2 MB -> 269 KB.
   4 launches, atrace: the two hero decodes 24-31 ms (was 85-170).  The slowest
   launch decode is now the logo (PNG, 54-103 ms).
+- **Logos stored at their drawn size: 54-103 -> 21-38 ms.** Logos fit the box
+  the showcase draws them in (36% of the screen's width x 60% of the hero
+  band: 692x298 max on the Thor; the fractions are shared constants in
+  GameShowcase), as lossy WebP (they have alpha).  They came as large as
+  6224x752 PNG, 3.8 MB -> 23 KB.  All launch decodes now 21-38 ms.

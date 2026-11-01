@@ -10,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -105,7 +107,7 @@ object ArtworkRepository {
                 if (extra == Extra.HERO && !(h > 0 && w >= 2 * h)) continue
                 Log.i(TAG, "${extra.name.lowercase()}: \"$name\" -> game $id, ${w}x$h")
                 val file = downloadTo(url, dest) ?: return@withContext ArtOutcome.Unreachable
-                if (extra == Extra.HERO) shrinkHero(context, file)
+                if (extra == Extra.HERO) shrinkHero(context, file) else shrinkLogo(context, file)
                 return@withContext ArtOutcome.Found(file)
             }
         }
@@ -173,42 +175,55 @@ object ArtworkRepository {
         }
     }
 
-    /**
-     * Widest a stored hero needs to be: the showcase draws it across the
-     * screen, so the long edge of the largest display (1920 on the Thor).
-     * SteamGridDB serves many heroes at 3840x1240 PNG, ~5 MB, which took
-     * 100+ ms to decode on every launch (PNG cannot be partially decoded).
-     */
-    private fun heroMaxWidth(context: Context): Int =
+    /** Long edge of the largest display (1920 on the Thor): the showcase
+     *  draws heroes across the screen and logos at a fixed share of it. */
+    private fun screenLongEdge(context: Context): Int =
         context.getSystemService(DisplayManager::class.java).displays
             .flatMap { d -> d.supportedModes.map { maxOf(it.physicalWidth, it.physicalHeight) } }
             .maxOrNull() ?: 1920
 
+    /** Hero: as wide as the screen.  SteamGridDB serves many at 3840x1240
+     *  PNG, ~5 MB, which took 100+ ms to decode on every launch. */
+    fun shrinkHero(context: Context, file: File): Boolean =
+        shrinkArt(file, screenLongEdge(context), Int.MAX_VALUE)
+
+    /** Logo: the box the showcase draws it in (GameShowcase).  Logos come as
+     *  large as 6224x752 PNG, ~4 MB, for a box of 691x372 on the Thor. */
+    fun shrinkLogo(context: Context, file: File): Boolean {
+        val edge = screenLongEdge(context)
+        return shrinkArt(
+            file,
+            ceil(edge * LOGO_WIDTH_FRACTION).toInt(),
+            ceil(edge / HERO_ASPECT * LOGO_HEIGHT_FRACTION).toInt(),
+        )
+    }
+
     /**
-     * Rewrites [file] in place, at most the screen's width and as JPEG (lossy
-     * WebP if it has transparency).  Also re-encodes a PNG that is already
-     * small enough: decoding PNG costs several times JPEG at the same size.
-     * Written to a temporary file and renamed over the original, so a reader
-     * never sees half a file.  Returns true if it changed anything.
+     * Rewrites [file] in place to fit within [maxW] x [maxH], as JPEG q90, or
+     * lossy WebP if it has transparency.  Also re-encodes a PNG that already
+     * fits: PNG decodes several times slower than JPEG at the same size, and
+     * cannot be partially decoded.  Written to a temporary file and renamed
+     * over the original, so a reader never sees half a file.  Returns true if
+     * it changed anything.
      */
-    fun shrinkHero(context: Context, file: File): Boolean = try {
-        val maxWidth = heroMaxWidth(context)
+    private fun shrinkArt(file: File, maxW: Int, maxH: Int): Boolean = try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
         val w = bounds.outWidth
         val h = bounds.outHeight
-        if (h <= 0 || (w <= maxWidth && bounds.outMimeType != "image/png")) {
+        val scale = minOf(maxW.toDouble() / w, maxH.toDouble() / h, 1.0)
+        if (w <= 0 || h <= 0 || (scale >= 1.0 && bounds.outMimeType != "image/png")) {
             false
         } else {
+            val tw = maxOf(1, (w * scale).roundToInt())
+            val th = maxOf(1, (h * scale).roundToInt())
             var sample = 1
-            while (w / (sample * 2) >= maxWidth) sample *= 2
+            while (w / (sample * 2) >= tw) sample *= 2
             val decoded = BitmapFactory.decodeFile(
                 file.path, BitmapFactory.Options().apply { inSampleSize = sample })
                 ?: throw IllegalStateException("undecodable")
-            val bmp = if (decoded.width > maxWidth) {
-                val th = (decoded.height.toLong() * maxWidth / decoded.width).toInt()
-                Bitmap.createScaledBitmap(decoded, maxWidth, th, true)
-                    .also { decoded.recycle() }
+            val bmp = if (decoded.width > tw) {
+                Bitmap.createScaledBitmap(decoded, tw, th, true).also { decoded.recycle() }
             } else decoded
             val tmp = File(file.path + ".tmp")
             tmp.outputStream().use {
@@ -217,7 +232,7 @@ object ArtworkRepository {
             }
             val before = file.length()
             if (!tmp.renameTo(file)) throw IllegalStateException("rename failed")
-            Log.i(TAG, "hero ${file.name}: ${w}x$h $before B -> ${bmp.width}x${bmp.height} ${file.length()} B")
+            Log.i(TAG, "shrunk ${file.name}: ${w}x$h $before B -> ${bmp.width}x${bmp.height} ${file.length()} B")
             bmp.recycle()
             true
         }
@@ -228,11 +243,16 @@ object ArtworkRepository {
         false
     }
 
-    /** Shrinks heroes cached before [shrinkHero] existed.  Reads only image
-     *  headers for those already done, so it is cheap to run on every launch. */
-    fun shrinkCachedHeroes(context: Context) {
-        artworkDir(context).listFiles { f -> f.name.startsWith("hero_") && f.name.endsWith(".img") }
-            ?.forEach { shrinkHero(context, it) }
+    /** Shrinks heroes and logos cached before they were sized on download.
+     *  Reads only image headers for those already done, so it is cheap to
+     *  run on every launch. */
+    fun shrinkCachedArt(context: Context) {
+        artworkDir(context).listFiles { f -> f.name.endsWith(".img") }?.forEach {
+            when {
+                it.name.startsWith("hero_") -> shrinkHero(context, it)
+                it.name.startsWith("logo_") -> shrinkLogo(context, it)
+            }
+        }
     }
 
     /** Writes [bmp] to [dest] as PNG. Returns null and cleans up on failure. */

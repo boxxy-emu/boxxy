@@ -35,7 +35,12 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
 /** Native shape of a SteamGridDB hero (1920x620, 3840x1240). */
-private const val HERO_ASPECT = 1920f / 620f
+internal const val HERO_ASPECT = 1920f / 620f
+
+/* The logo's box: this share of the screen's width, and of the hero band's
+ * height.  ArtworkRepository stores logos at this size, so keep them shared. */
+internal const val LOGO_WIDTH_FRACTION = 0.36f
+internal const val LOGO_HEIGHT_FRACTION = 0.6f
 
 /* Decode size of the blurred backdrop (see where it is drawn). */
 private const val BACKDROP_W = 480
@@ -166,7 +171,7 @@ fun GameShowcase(
                     AsyncImage(
                         model = g.logoUri, contentDescription = g.displayName,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.width(fullWidth * 0.36f).height(bandHeight * 0.6f),
+                        modifier = Modifier.width(fullWidth * LOGO_WIDTH_FRACTION).height(bandHeight * LOGO_HEIGHT_FRACTION),
                     )
                 } else {
                     Text(

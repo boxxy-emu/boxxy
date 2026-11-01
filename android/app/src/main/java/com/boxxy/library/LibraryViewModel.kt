@@ -95,7 +95,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             // Once the launch has settled: shrinking a 3840-wide hero takes
             // a decode of its own, which should not compete with the first one.
             delay(5000)
-            ArtworkRepository.shrinkCachedHeroes(getApplication())
+            ArtworkRepository.shrinkCachedArt(getApplication())
         }
         viewModelScope.launch(Dispatchers.IO) {
             // Written a second after the list settles, so a burst of art
