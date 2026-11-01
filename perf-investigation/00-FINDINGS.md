@@ -5321,3 +5321,10 @@ after `cmd package compile -m speed-profile -f`.
   instead of ~19 MB and looks the same under the 32 dp blur.  The decode cost
   is in the file itself: storing heroes at screen size (1920 wide) would be
   the fix.
+- **Heroes stored at screen size: 100-170 -> 24-31 ms per decode.** Heroes are
+  now rewritten at most as wide as the device's largest display (long edge of
+  its supported modes: 1920 on the Thor), as JPEG q90 (lossy WebP if alpha);
+  PNGs already small enough are re-encoded too.  New downloads on arrival,
+  older ones by a pass 5 s after launch.  Halo 3840x1240 PNG 5.2 MB -> 269 KB.
+  4 launches, atrace: the two hero decodes 24-31 ms (was 85-170).  The slowest
+  launch decode is now the logo (PNG, 54-103 ms).

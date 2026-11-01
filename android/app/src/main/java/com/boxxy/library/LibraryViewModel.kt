@@ -92,6 +92,12 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         _games.value = loadSnapshot()
         rescan()
         viewModelScope.launch(Dispatchers.IO) {
+            // Once the launch has settled: shrinking a 3840-wide hero takes
+            // a decode of its own, which should not compete with the first one.
+            delay(5000)
+            ArtworkRepository.shrinkCachedHeroes(getApplication())
+        }
+        viewModelScope.launch(Dispatchers.IO) {
             // Written a second after the list settles, so a burst of art
             // updates is one write.  collectLatest drops the pending one.
             _games.drop(1).collectLatest { delay(1000); saveSnapshot(it) }
@@ -461,7 +467,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                     val dest = if (extra == ArtworkRepository.Extra.HERO)
                         ArtworkRepository.heroFile(ctx, name) else ArtworkRepository.logoFile(ctx, name)
                     if (ArtworkRepository.knownMissing(dest)) continue
-                    when (val r = ArtworkRepository.fetchExtra(name, extra, dest, key)) {
+                    when (val r = ArtworkRepository.fetchExtra(ctx, name, extra, dest, key)) {
                         is ArtworkRepository.ArtOutcome.Found -> {
                             val u = Uri.fromFile(r.file)
                             _games.value = _games.value.map { g ->
