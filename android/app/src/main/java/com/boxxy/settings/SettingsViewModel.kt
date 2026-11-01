@@ -1,6 +1,7 @@
 package com.boxxy.settings
 
 import com.boxxy.NativeInterface
+import com.boxxy.XemuApplication
 import com.boxxy.emulation.PREF_PERF_OVERLAY
 
 import android.app.Application
@@ -9,9 +10,12 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
 import java.io.File
@@ -39,8 +43,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
      *
      * The contents are a convenience, never something that cannot be re-entered,
      * so an unreadable store is discarded and rebuilt rather than propagated.
+     *
+     * Opened lazily, and first from a background thread (see the init block
+     * after _steamGridDbKey): creating the Keystore master key and Tink keysets
+     * on the main thread delayed every cold launch's first frame.
      */
-    private val securePrefs: SharedPreferences? = openSecurePrefs(app)
+    private val securePrefs: SharedPreferences? by lazy { openSecurePrefs(app) }
 
     private fun openSecurePrefs(app: Application): SharedPreferences? {
         repeat(2) { attempt ->
@@ -103,9 +111,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     // ── Box art ───────────────────────────────────────────────────────────────
 
     /** API key from https://www.steamgriddb.com/profile/preferences */
-    private val _steamGridDbKey =
-        MutableStateFlow(securePrefs?.getString("steamgriddb_key", "") ?: "")
+    private val _steamGridDbKey = MutableStateFlow("")
     val steamGridDbKey: StateFlow<String> = _steamGridDbKey
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val stored = securePrefs?.getString("steamgriddb_key", "") ?: ""
+            // A key typed in before this finished wins over the stored one.
+            _steamGridDbKey.compareAndSet("", stored)
+        }
+    }
 
     /** True when the key store could not be opened, so a key cannot be saved. */
     val secureStoreUnavailable: Boolean get() = securePrefs == null
@@ -206,7 +221,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setAccurateMemOrdering(value: Boolean) {
         _accurateMemOrdering.value = value
         prefs.edit().putBoolean("accurate_mem_ordering", value).apply()
-        NativeInterface.setAccurateMemoryOrdering(value)
+        if (XemuApplication.nativeLoaded) NativeInterface.setAccurateMemoryOrdering(value)
     }
 
     /*
@@ -222,7 +237,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setFastOrderedLoads(value: Boolean) {
         _fastOrderedLoads.value = value
         prefs.edit().putBoolean("fast_ordered_loads", value).apply()
-        NativeInterface.setLdapr(value)
+        if (XemuApplication.nativeLoaded) NativeInterface.setLdapr(value)
     }
 
     /*
@@ -264,7 +279,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setHrtf(value: Boolean) {
         _hrtf.value = value
         prefs.edit().putBoolean("audio_hrtf", value).apply()
-        NativeInterface.setHrtf(value)
+        if (XemuApplication.nativeLoaded) NativeInterface.setHrtf(value)
     }
 
     private val _voiceWorkers = MutableStateFlow(prefs.getInt("audio_voice_workers", 2))

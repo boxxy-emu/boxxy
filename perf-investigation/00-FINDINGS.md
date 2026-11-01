@@ -5272,3 +5272,45 @@ slots 1/5/7, two rounds x two passes: NV2A +0.01 / +0.09 / +0.11 ms, vCPU
 -0.12 / -0.22 / -0.10 ms (noise), frames locked at 33.5 ms, slow frames 4 vs
 6. Upstream is now fully synced to dc10b4cea9 except xblc, DSP JIT, desktop
 UI and CI.
+
+## CR. APP COLD LAUNCH: 211 -> 185 MS TO CARDS ON SCREEN, VS DOLPHIN 118 (2026-10-31)
+
+Cold launch = `am force-stop`, HOME, `am start -W` (TotalTime = first frame),
+round-robin with the other emulators, 6-8 rounds.  "Fully drawn" is
+`reportFullyDrawn()` once the game list is non-empty (MainActivity).
+
+**Measure release, non-debuggable** (`assembleRelease -PreleaseDebuggable=false`).
+ART never compiles a debuggable app (`dumpsys package dexopt`: run-from-apk),
+so the usual debug build launches at ~270 ms and drifted to ~500 ms across a
+reinstall: not comparable with anything.  The other emulators are
+speed-profile (bg-dexopt).  Both states measured: fresh install (verify) and
+after `cmd package compile -m speed-profile -f`.
+
+| build (speed-profile) | first frame | cards on screen |
+|---|---|---|
+| Dolphin / melonDS / DuckStation | 118 / 137 / 170 | |
+| A: as was | 211 | first frame + scan (~60 ms) |
+| B: libxemu.so only in :EmulationProcess | 204 | |
+| C: + encrypted prefs opened off the main thread | 142 | 200 |
+| D: + last scan's list shown on the first frame | 185 | 185 |
+| Cemu / Azahar | 370 / 467 | |
+
+- **libxemu.so in the library process: ~7-12 ms, not the big cost.** The 55 MB
+  library maps lazily.  Kept anyway (XemuApplication loads it only in the
+  emulation process; the library process had no use for it).
+- **Keystore: ~50 ms on the main thread.** atrace binder events: six serial
+  ~8 ms calls to keystore2 inside the first Compose:recompose, from
+  EncryptedSharedPreferences/MasterKey in SettingsViewModel's constructor
+  (only the SteamGridDB key lives there).  Now lazy, first opened on IO.
+- **Game list snapshot.** Every launch rescanned the folders (SAF) and every
+  disc before showing a card.  `files/library_snapshot.json` is shown on the
+  first frame; the rescan replaces it once (no flicker), keeping art the
+  background fetch added meanwhile if its file still exists.  The first frame
+  is heavier (it now composes the cards), so first frame rose 142 -> 185 but
+  cards-on-screen fell 200 -> 185.
+- **Where the rest goes (atrace, D).** Main thread done with the top screen at
+  ~135 ms; RenderThread's first draw is ~30 ms (EGL context 13, setSurface 19).
+  The bottom-screen Presentation is shown from a DisposableEffect, so its
+  window lays out a frame later (169-219 ms) and TotalTime waits for it.
+  Hero art decodes off-thread until ~250 ms: the hero is decoded twice at full
+  size (sharp band + 32 dp-blurred backdrop).

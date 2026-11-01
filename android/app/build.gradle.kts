@@ -49,7 +49,10 @@ android {
             // non-debuggable packages. Doesn't affect optimization/codegen, only
             // allows debugger/profiler attachment -- same "not for distribution"
             // caveat as the signing config above.
-            isDebuggable = true
+            // `-PreleaseDebuggable=false` builds it as users would get it: ART
+            // only compiles non-debuggable apps ahead of time, so launch-time
+            // measurements need this (a debuggable build runs interpreted).
+            isDebuggable = (project.findProperty("releaseDebuggable") as String?) != "false"
         }
     }
     compileOptions {

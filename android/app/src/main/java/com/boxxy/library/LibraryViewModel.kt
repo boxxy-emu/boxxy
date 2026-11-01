@@ -7,13 +7,17 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 private val GAME_EXTENSIONS = setOf("iso")
@@ -78,7 +82,63 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         loadDirs()
+        /*
+         * Show the games from the last run on the first frame, then rescan.
+         * The scan walks every folder through the storage framework and opens
+         * every disc, so without this each cold launch drew an empty library
+         * and the cards arrived a scan later.  The file is a few KB; reading
+         * it here is cheaper than the extra frames an async load would cost.
+         */
+        _games.value = loadSnapshot()
         rescan()
+        viewModelScope.launch(Dispatchers.IO) {
+            // Written a second after the list settles, so a burst of art
+            // updates is one write.  collectLatest drops the pending one.
+            _games.drop(1).collectLatest { delay(1000); saveSnapshot(it) }
+        }
+    }
+
+    private val snapshotFile get() = File(getApplication<Application>().filesDir, "library_snapshot.json")
+
+    private fun loadSnapshot(): List<GameEntry> = try {
+        val arr = JSONArray(snapshotFile.readText())
+        (0 until arr.length()).map { i ->
+            val o = arr.getJSONObject(i)
+            fun uri(k: String) = o.optString(k).ifEmpty { null }?.let { Uri.parse(it) }
+            GameEntry(
+                uri = Uri.parse(o.getString("uri")),
+                displayName = o.getString("name"),
+                coverUri = uri("cover"),
+                discTitle = o.optString("discTitle").ifEmpty { null },
+                titleId = if (o.has("titleId")) o.getInt("titleId") else null,
+                coverIsDiscArt = o.optBoolean("coverIsDiscArt"),
+                heroUri = uri("hero"),
+                logoUri = uri("logo"),
+            )
+        }
+    } catch (e: Exception) {
+        emptyList()   // first run, or unreadable: the scan fills it in
+    }
+
+    private fun saveSnapshot(games: List<GameEntry>) {
+        val arr = JSONArray()
+        for (g in games) arr.put(JSONObject().apply {
+            put("uri", g.uri.toString())
+            put("name", g.displayName)
+            g.coverUri?.let { put("cover", it.toString()) }
+            g.discTitle?.let { put("discTitle", it) }
+            g.titleId?.let { put("titleId", it) }
+            put("coverIsDiscArt", g.coverIsDiscArt)
+            g.heroUri?.let { put("hero", it.toString()) }
+            g.logoUri?.let { put("logo", it.toString()) }
+        })
+        try {
+            val tmp = File(snapshotFile.path + ".tmp")
+            tmp.writeText(arr.toString())
+            tmp.renameTo(snapshotFile)
+        } catch (e: Exception) {
+            // Only a startup shortcut; the next scan rebuilds it.
+        }
     }
 
     private fun loadDirs() {
@@ -127,7 +187,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             found.sortBy { it.displayName.lowercase() }
 
             // Apply locally cached artwork immediately (no network round-trip)
-            _games.value = found.map { game ->
+            val scanned = found.map { game ->
                 if (game.coverUri != null) game
                 else {
                     val cached = ArtworkRepository.cachedFile(ctx, game.displayName)
@@ -135,10 +195,19 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
+            /*
+             * With nothing on screen, games appear as they are found.  With the
+             * last run's list showing, the scan works on its own copy and
+             * replaces the list once, so the cards do not flicker through
+             * half-resolved states.
+             */
+            val progressive = _games.value.isEmpty()
+            if (progressive) _games.value = scanned
+
             // Read titles and art out of the discs themselves. This needs no
             // network and no key, so it is what fills the grid in practice.
-            resolveDiscInfo(ctx)
-            applyCachedExtras(ctx)
+            val resolved = withCachedExtras(ctx, resolveDiscInfo(ctx, scanned, progressive))
+            publishScan(resolved)
 
             // Only then try the network, which can upgrade a 128x128 title
             // image to a proper cover if the user has supplied a key.
@@ -234,8 +303,13 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
      * Only reads a few KB per disc, but still off the main thread — these are
      * multi-GB files behind a content provider.
      */
-    private fun resolveDiscInfo(ctx: Context) {
-        for (game in _games.value) {
+    private fun resolveDiscInfo(
+        ctx: Context,
+        games: List<GameEntry>,
+        publish: Boolean,
+    ): List<GameEntry> {
+        var list = games
+        for (game in games) {
             val info = XisoReader.read(ctx, game.uri) ?: continue
 
             // A choice the user made explicitly outranks every other source.
@@ -264,7 +338,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
-            _games.value = _games.value.map { g ->
+            val update = { g: GameEntry ->
                 if (g.uri == game.uri) {
                     g.copy(
                         coverUri = cover,
@@ -274,6 +348,29 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 } else g
             }
+            list = list.map(update)
+            if (publish) _games.value = _games.value.map(update)
+        }
+        return list
+    }
+
+    /**
+     * Replace the list with a finished scan.  Art the background fetch put on
+     * a game while the scan ran is kept when the scan found none, as long as
+     * its file still exists (Re-fetch deletes files, and those must stay gone).
+     */
+    private fun publishScan(scanned: List<GameEntry>) {
+        fun Uri?.alive() = this != null && (scheme != "file" || File(path ?: "").exists())
+        val current = _games.value.associateBy { it.uri }
+        _games.value = scanned.map { g ->
+            val c = current[g.uri] ?: return@map g
+            var out = g
+            if (g.coverUri == null && c.coverUri.alive()) {
+                out = out.copy(coverUri = c.coverUri, coverIsDiscArt = c.coverIsDiscArt)
+            }
+            if (g.heroUri == null && c.heroUri.alive()) out = out.copy(heroUri = c.heroUri)
+            if (g.logoUri == null && c.logoUri.alive()) out = out.copy(logoUri = c.logoUri)
+            out
         }
     }
 
@@ -337,13 +434,16 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Heroes and logos already downloaded, under either name. */
     private fun applyCachedExtras(ctx: Context) {
-        _games.value = _games.value.map { g ->
+        _games.value = withCachedExtras(ctx, _games.value)
+    }
+
+    private fun withCachedExtras(ctx: Context, games: List<GameEntry>): List<GameEntry> =
+        games.map { g ->
             val names = extraNames(g)
             val hero = names.map { ArtworkRepository.heroFile(ctx, it) }.firstOrNull { it.exists() }
             val logo = names.map { ArtworkRepository.logoFile(ctx, it) }.firstOrNull { it.exists() }
             g.copy(heroUri = hero?.let { Uri.fromFile(it) }, logoUri = logo?.let { Uri.fromFile(it) })
         }
-    }
 
     /**
      * Look up a hero and a logo for every game still without them, disc title

@@ -147,6 +147,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         maybeRelaunchGame(intent)
         maybeAutoLaunch()
+        // "Fully drawn" = the game cards are on screen.  The system logs the
+        // time from launch ("Fully drawn com.boxxy/.MainActivity: +NNNms"),
+        // which is how cold-launch time to content is measured.
+        lifecycleScope.launch {
+            libraryViewModel.games.first { it.isNotEmpty() }
+            reportFullyDrawn()
+        }
         enableEdgeToEdge()
         // Dark theme — force light (white) status bar icons
         WindowInsetsControllerCompat(window, window.decorView)
