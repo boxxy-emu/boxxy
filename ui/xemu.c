@@ -1787,6 +1787,39 @@ static void report_stats(void)
 
 extern int xemu_vcpu_tid;      /* accel/tcg/cpu-exec.c */
 
+/*
+ * The vCPU thread's time runnable but not running (kernel schedstat field 2,
+ * ns), or -1.  A slow frame where the vCPU was neither on a CPU nor halted is
+ * either this, or the thread asleep on a lock (bql-wait lines).  FINDINGS CS.
+ */
+static int64_t vcpu_run_delay_ns(void)
+{
+    static int fd = -1;
+    char b[96];
+    unsigned long long run, delay;
+    ssize_t n;
+
+    if (fd < 0) {
+        if (!xemu_vcpu_tid) {
+            return -1;
+        }
+        snprintf(b, sizeof(b), "/proc/self/task/%d/schedstat", xemu_vcpu_tid);
+        fd = open(b, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) {
+            return -1;
+        }
+    }
+    n = pread(fd, b, sizeof(b) - 1, 0);
+    if (n <= 0) {
+        return -1;
+    }
+    b[n] = 0;
+    if (sscanf(b, "%llu %llu", &run, &delay) != 2) {
+        return -1;
+    }
+    return (int64_t)delay;
+}
+
 /* ---- Cycle counter -----------------------------------------------------
  *
  * The frame cost of a fixed workload drifts up ~7% over a session while
@@ -3505,6 +3538,10 @@ static void gl_render_frame(struct xemu_console *scon)
                         extern int g_xemu_pfifo_clock_ok, g_xemu_vcpu_clock_ok;
                         static int64_t p_gpu_ns, p_cpu_ns;
                         int64_t gpu_ns = 0, cpu_ns = 0;
+                        extern unsigned long long xemu_halt_max_ticks;
+                        extern int xemu_halt_max_vec;
+                        static int64_t p_run_delay = -1;
+                        int64_t run_delay = vcpu_run_delay_ns();
                         struct timespec tts;
                         if (g_xemu_pfifo_clock_ok &&
                             !clock_gettime(g_xemu_pfifo_clock, &tts)) {
@@ -3568,6 +3605,15 @@ static void gl_render_frame(struct xemu_console *scon)
                                       "reinjected %u", xemu_pic_irq0_edges,
                                       xemu_pic_irq0_reinjected);
                             }
+                            /* Where an idle vCPU's time went (FINDINGS CS):
+                             * queued for a CPU, or one long halt and the
+                             * interrupt (vector) that ended it. */
+                            ALOGI("bench: vCPU wait | runq %.1f ms | longest "
+                                  "halt %.1f ms vec %d",
+                                  run_delay >= 0 && p_run_delay >= 0
+                                      ? (run_delay - p_run_delay) / 1e6 : -1.0,
+                                  xemu_halt_max_ticks * 1000.0 / idle_freq,
+                                  xemu_halt_max_vec);
                         }
                         p_sh = sh; p_full = f; p_part = pa;
                         p_nd = xemu_notdirty_writes;
@@ -3582,6 +3628,8 @@ static void gl_render_frame(struct xemu_console *scon)
                         p_gpu_ns = gpu_ns; p_cpu_ns = cpu_ns;
                         p_halt_t = xemu_idle_halt_ticks;
                         p_halts = xemu_idle_halts;
+                        p_run_delay = run_delay;
+                        xemu_halt_max_ticks = 0;
                     }
 
                     if (ft > s_run_worst_ms) {

@@ -253,6 +253,7 @@ void helper_xemu_stall(CPUX86State *env)
 int g_xemu_idle_halt = 1;
 unsigned long long xemu_idle_halts;
 uint64_t xemu_idle_halt_t0;       /* cntvct at the halt, 0 when running */
+int xemu_last_irq_vec = -1;       /* hardware vector last delivered */
 
 /*
  * DIAGNOSTIC (debug.xemu.kprcb_watch=1): log every guest store to
@@ -861,6 +862,7 @@ void helper_xemu_spin_wait(CPUX86State *env, uint32_t ctr)
     xemu_spin_halts++;
     xemu_idle_halts++;
     asm volatile("mrs %0, cntvct_el0" : "=r"(xemu_idle_halt_t0));
+    xemu_last_irq_vec = -1;
     cs = env_cpu(env);
     cs->halted = 1;
     cs->exception_index = EXCP_HLT;
@@ -892,6 +894,7 @@ void helper_xemu_idle(CPUX86State *env)
     }
     xemu_idle_halts++;
     asm volatile("mrs %0, cntvct_el0" : "=r"(xemu_idle_halt_t0));
+    xemu_last_irq_vec = -1;
     cs = env_cpu(env);
     do_end_instruction(env);
     cs->halted = 1;

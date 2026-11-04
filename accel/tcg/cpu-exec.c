@@ -193,12 +193,21 @@ int g_xemu_vcpu_clock_ok;
 static uint64_t xemu_idle_prev;
 unsigned long long xemu_idle_halt_ticks;   /* time halted by idle_halt */
 extern uint64_t xemu_idle_halt_t0;
+/* Longest single halt since ui/xemu.c last reset it, and the vector that
+ * ended it (-1: woken without an interrupt).  FINDINGS CS. */
+unsigned long long xemu_halt_max_ticks;
+int xemu_halt_max_vec = -1;
+extern int xemu_last_irq_vec;      /* target/i386/tcg/misc_helper.c */
 static inline void xemu_idle_note(vaddr pc)
 {
     if (xemu_idle_halt_t0) {
         uint64_t t;
         asm volatile("mrs %0, cntvct_el0" : "=r"(t));
         xemu_idle_halt_ticks += t - xemu_idle_halt_t0;
+        if (t - xemu_idle_halt_t0 > xemu_halt_max_ticks) {
+            xemu_halt_max_ticks = t - xemu_idle_halt_t0;
+            xemu_halt_max_vec = xemu_last_irq_vec;
+        }
         xemu_idle_halt_t0 = 0;
     }
     if (pc >= XEMU_IDLE_LO && pc <= XEMU_IDLE_HI) {

@@ -5370,3 +5370,51 @@ after `cmd package compile -m speed-profile -f`.
   debug build is the build type, not the app.  (The native layer is -O2 in
   both build types, so gameplay is unaffected.)  Beware the Thor's OLED
   "anti-image-retention pixel refresh": it ran during one recording.
+
+## CS. A HALO AUTO-CAPTURE: WHAT THE STALLS WERE, A SAVE-STATE CRASH, AND NEW STALL PROBES (2026-11-03)
+
+**The user's play session (~7 min of log, 20:53-21:00).** 17 slow frames:
+ten 50-67 ms; three bursts of real guest work (100-134 ms: vCPU ~90 ms,
+xpage 4-7k, the CE catch-up pattern); three ~185-197 ms where the vCPU did
+almost nothing -- two halted 160-186 ms in a few long halts, one neither
+running nor halted (on-CPU 11 ms, halted 17 ms of 197).  No `ide-slow` line
+(HDD or DVD over 15 ms) near them.  The capture at 21:00:20 itself cost the
+rest: the save stopped the VM 187 ms (a 200 ms frame), then three HDD reads
+took 21-68 ms behind the 70 MB snapshot write (a 201 ms frame).  Auto-capture
+is now off for the user; the live log is the evidence for one-off stalls (CE).
+
+**New always-on probes for the "neither running nor halted" stall.**
+- `bql-hold:` / `bql-wait:` (system/cpus.c, xemu-stdout): any single BQL
+  hold or acquire wait of 30 ms or more, with thread and site.
+  CLOCK_MONOTONIC_COARSE (a few ns, ~4 ms resolution); condition waits that
+  release the BQL (the vCPU's halt sleep, run_on_cpu, pause) are excluded.
+  Seen so far: the vCPU holding it 32-40 ms in MMIO (cputlb.c:2641, the BL
+  pattern) and qemu_main 176-180 ms in apu.c:421 -- the APU quiescing while
+  the VM stops for a state load, not gameplay.
+- `bench: vCPU wait | runq X ms | longest halt Y ms vec N` after every
+  slow/ref frame (ui/xemu.c): the vCPU thread's runnable-but-not-running time
+  from /proc/self/task/<tid>/schedstat, and the longest idle halt with the
+  vector that ended it (0x30 = IRQ0 timer; -1 = woken without an interrupt).
+  First reading: a 134 ms frame with runq 23.1 ms.
+
+**Bug found on the way: NV2A PTIMER never initialised on Android.**
+Loading the auto-capture crashed (SIGSEGV in timer_mod_ns from get_timer).
+Upstream's nv2a `ptimer_init()` (CP sync, PTIMER alarm interrupts) shares its
+name with QEMU's generic `hw/core/ptimer.c` `ptimer_init()`; the Android link
+(`--allow-multiple-definition`, libsystem.a first) bound nv2a's call to the
+generic one, so `d->ptimer.timer` was never timer_init'ed.  Snapshots saved
+it with expire_time 0 ("armed"), so loading any snapshot saved since the CP
+sync into a running VM dereferenced a NULL timer list; a game enabling the
+PTIMER alarm would have crashed the same way.  Fixed by renaming it
+`nv2a_ptimer_init`.  `get_timer` (migration/savevm.c) now logs and skips an
+uninitialised timer instead of crashing.  Snapshots from the broken builds
+load harmlessly: their bogus timer fires once with the alarm interrupt
+disabled (it could not have been enabled -- that path crashed).  Verified:
+the auto-capture loads (149 frames, all 33-36 ms) and a test_ save/load
+round trip works.  A scan of every global symbol defined twice across the
+core archives found no other real collision (the rest are stubs for unused
+monitor/QMP/IOAPIC/HPET code).  Lesson: with --allow-multiple-definition,
+check new upstream global names against the other archives.
+
+**Also noticed:** old `*_bench_auto@*.xstate` files are never pruned: 8 for
+Halo plus other games, 840 MB of files/states.

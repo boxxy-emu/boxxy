@@ -68,6 +68,12 @@
 
 /* The Big QEMU Lock (BQL) */
 static QemuMutex bql;
+#if defined(__ANDROID__) || defined(ANDROID)
+/* Long BQL hold/wait logging; defined with the BQL profiler below. */
+static int64_t bql_held_since;
+static int64_t bql_coarse_ms(void);
+static void bql_cond_wait(QemuCond *cond);
+#endif
 
 /*
  * The chosen accelerator is supposed to register this.
@@ -459,6 +465,10 @@ void qemu_init_cpu_loop(void)
 void run_on_cpu(CPUState *cpu, run_on_cpu_func func, run_on_cpu_data data)
 {
     do_run_on_cpu(cpu, func, data, &bql);
+#if defined(__ANDROID__) || defined(ANDROID)
+    /* It waited on qemu_work_cond, releasing the BQL: restart the hold. */
+    bql_held_since = bql_coarse_ms();
+#endif
 }
 
 static void qemu_cpu_stop(CPUState *cpu, bool exit)
@@ -491,7 +501,11 @@ void qemu_process_cpu_events(CPUState *cpu)
             slept = true;
             qemu_plugin_vcpu_idle_cb(cpu);
         }
+#if defined(__ANDROID__) || defined(ANDROID)
+        bql_cond_wait(cpu->halt_cond);
+#else
         qemu_cond_wait(cpu->halt_cond, &bql);
+#endif
     }
     if (slept) {
         qemu_plugin_vcpu_resume_cb(cpu);
@@ -622,6 +636,71 @@ static int64_t bql_now_ns(void)
     return ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
+/*
+ * Always on: a single BQL hold or wait of BQL_LONG_MS or more is logged with
+ * the site and thread ("bql-hold:" / "bql-wait:").  For one-off stalls in
+ * play, where the vCPU was neither running nor halted (FINDINGS CS).  The
+ * coarse clock is a few ns and ~4 ms resolution, plenty at this threshold.
+ */
+#define BQL_LONG_MS 30
+static int64_t bql_held_since;       /* coarse ms; written by the holder */
+static const char *bql_held_file;
+static int bql_held_line;
+static char bql_held_thread[16];
+
+static int64_t bql_coarse_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
+    return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000;
+}
+
+static const char *bql_thread_name(void)
+{
+    if (!bql_t_name[0]) {
+        prctl(PR_GET_NAME, bql_t_name);
+    }
+    return bql_t_name;
+}
+
+static void bql_note_acquired(const char *file, int line, int64_t w0)
+{
+    int64_t now = bql_coarse_ms();
+    if (now - w0 >= BQL_LONG_MS) {
+        const char *f = strrchr(file, '/'), *hf = bql_held_file ?
+            strrchr(bql_held_file, '/') : NULL;
+        fprintf(stderr, "bql-wait: %s waited %" PRId64 " ms at %s:%d; "
+                "last holder %s at %s:%d\n", bql_thread_name(), now - w0,
+                f ? f + 1 : file, line, bql_held_thread,
+                hf ? hf + 1 : "?", bql_held_line);
+    }
+    bql_held_since = now;
+    bql_held_file = file;
+    bql_held_line = line;
+    memcpy(bql_held_thread, bql_thread_name(), 16);
+}
+
+static void bql_note_releasing(void)
+{
+    int64_t held = bql_coarse_ms() - bql_held_since;
+    if (bql_held_since && held >= BQL_LONG_MS) {
+        const char *f = bql_held_file ? strrchr(bql_held_file, '/') : NULL;
+        fprintf(stderr, "bql-hold: %s held %" PRId64 " ms from %s:%d\n",
+                bql_held_thread, held, f ? f + 1 : "?", bql_held_line);
+    }
+}
+
+/* A condition wait that releases the BQL: the sleep is neither a hold nor
+ * a wait, so close the hold before it and start a new one after. */
+static void bql_cond_wait(QemuCond *cond)
+{
+    const char *file = bql_held_file;
+    int line = bql_held_line;
+    bql_note_releasing();
+    qemu_cond_wait(cond, &bql);
+    bql_note_acquired(file, line, bql_coarse_ms());
+}
+
 static BqlSite *bql_site(const char *file, int line)
 {
     if (!bql_t_name[0]) {
@@ -680,6 +759,7 @@ void bql_lock_impl(const char *file, int line)
 
     g_assert(!bql_locked());
 #if defined(__ANDROID__) || defined(ANDROID)
+    int64_t w0 = bql_coarse_ms();
     if (bql_prof_on > 0) {
         int64_t t0 = bql_now_ns();
         bql_lock_fn(&bql, file, line);
@@ -689,9 +769,13 @@ void bql_lock_impl(const char *file, int line)
             bql_t_site->n++;
             bql_t_site->wait_ns += bql_t_acq - t0;
         }
+        bql_note_acquired(file, line, w0);
         return;
     }
     bql_t_site = NULL;
+    bql_lock_fn(&bql, file, line);
+    bql_note_acquired(file, line, w0);
+    return;
 #endif
     bql_lock_fn(&bql, file, line);
 }
@@ -701,6 +785,7 @@ void bql_unlock(void)
     g_assert(bql_locked());
     g_assert(!bql_unlock_blocked);
 #if defined(__ANDROID__) || defined(ANDROID)
+    bql_note_releasing();
     {
         int64_t now = 0;
         if (bql_t_site) {
@@ -747,7 +832,7 @@ void qemu_cond_wait_bql(QemuCond *cond)
     if (site) {
         site->hold_ns += bql_now_ns() - bql_t_acq;
     }
-    qemu_cond_wait(cond, &bql);
+    bql_cond_wait(cond);
     if (site) {
         bql_t_acq = bql_now_ns();
     }
@@ -758,6 +843,14 @@ void qemu_cond_wait_bql(QemuCond *cond)
 
 void qemu_cond_timedwait_bql(QemuCond *cond, int ms)
 {
+#if defined(__ANDROID__) || defined(ANDROID)
+    const char *file = bql_held_file;
+    int line = bql_held_line;
+    bql_note_releasing();
+    qemu_cond_timedwait(cond, &bql, ms);
+    bql_note_acquired(file, line, bql_coarse_ms());
+    return;
+#endif
     qemu_cond_timedwait(cond, &bql, ms);
 }
 
@@ -820,7 +913,11 @@ void pause_all_vcpus(void)
     replay_mutex_unlock();
 
     while (!all_vcpus_paused()) {
+#if defined(__ANDROID__) || defined(ANDROID)
+        bql_cond_wait(&qemu_pause_cond);
+#else
         qemu_cond_wait(&qemu_pause_cond, &bql);
+#endif
         /* FIXME: is this needed? */
         CPU_FOREACH(cpu) {
             qemu_cpu_kick(cpu);
@@ -893,7 +990,11 @@ void qemu_init_vcpu(CPUState *cpu)
     cpus_accel->create_vcpu_thread(cpu);
 
     while (!cpu->created) {
+#if defined(__ANDROID__) || defined(ANDROID)
+        bql_cond_wait(&qemu_cpu_cond);
+#else
         qemu_cond_wait(&qemu_cpu_cond, &bql);
+#endif
     }
 }
 
