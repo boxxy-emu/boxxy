@@ -5418,3 +5418,22 @@ check new upstream global names against the other archives.
 
 **Also noticed:** old `*_bench_auto@*.xstate` files are never pruned: 8 for
 Halo plus other games, 840 MB of files/states.
+
+## CT. SAVE-STATE CLEAN-UP: STALE FILES THAT PRUNE COULD NOT SEE (2026-11-03)
+
+Not performance; recorded here because CS found it.  xemu_fast_prune() only
+walks the disk image's snapshots: for each duplicated name it keeps the
+newest loadable one and deletes the rest with their files.  A state file
+whose disk snapshot is already gone (an interrupted write, an old bug) is
+invisible to it and stays forever, as did an *.xstate.tmp from an
+interrupted write (51 MB, Jade, since 2026-10-15).  The 840 MB seen in CS
+were mostly ordinary duplicates still waiting for a prune; the user's next
+session pruned 7 of the 8 Halo captures.
+
+Now prune also sweeps the state directory: a file is deleted when the disk
+has a live snapshot of the same name but none of that date (a superseded
+save -- unloadable, since loads pair file and snapshot by date), or when it
+is a *.xstate.tmp with no write in flight.  A name the disk has no snapshot
+of is left alone (it may belong to another HDD image), and nothing is judged
+if the snapshot list cannot be read.  Tested with planted files: a stale
+date of a known name and the .tmp were removed, an unknown name kept, 2.1 ms.

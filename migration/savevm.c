@@ -3539,9 +3539,67 @@ void xemu_fast_save_end(bool written)
 }
 
 /*
+ * State files with no disk snapshot of the same name and date can never be
+ * loaded (a load pairs them by date), but the duplicate pass below only walks
+ * the disk's snapshots, so they were never deleted: 840 MB of old benchmark
+ * captures on the Thor (FINDINGS CT).  A file counts as stale only when the
+ * disk has a newer snapshot of the same name.  Also removes *.xstate.tmp left
+ * by an interrupted write, unless a write is in flight.  alive[i] says
+ * whether tab[i] survived the duplicate pass.
+ */
+static int xstate_prune_orphans(const char *dir, const QEMUSnapshotInfo *tab,
+                                const bool *alive, int n)
+{
+    GDir *d = g_dir_open(dir, 0, NULL);
+    const char *f;
+    int deleted = 0;
+
+    if (!d) {
+        return 0;
+    }
+    while ((f = g_dir_read_name(d))) {
+        const char *at = strrchr(f, '@');
+        unsigned sec, nsec;
+        bool orphan;
+
+        if (g_str_has_suffix(f, ".xstate.tmp")) {
+            orphan = !xs_pending.data;
+        } else if (!g_str_has_suffix(f, ".xstate") || !at ||
+                   sscanf(at + 1, "%u.%u.xstate", &sec, &nsec) != 2) {
+            continue;                    /* not ours */
+        } else {
+            /* Stale only if this disk still has the name (a newer save of
+             * it) but not this date.  A name it has no snapshot of at all
+             * may belong to another HDD image: left alone. */
+            size_t len = at - f;
+            bool name_known = false, paired = false;
+            for (int i = 0; i < n; i++) {
+                if (alive[i] && strlen(tab[i].name) == len &&
+                    !strncmp(tab[i].name, f, len)) {
+                    name_known = true;
+                    paired |= tab[i].date_sec == sec &&
+                              tab[i].date_nsec == nsec;
+                }
+            }
+            orphan = name_known && !paired;
+        }
+        if (orphan) {
+            g_autofree char *path = g_strdup_printf("%s/%s", dir, f);
+            if (unlink(path) == 0) {
+                fprintf(stderr, "fast-save: removed orphan state file %s\n", f);
+                deleted++;
+            }
+        }
+    }
+    g_dir_close(d);
+    return deleted;
+}
+
+/*
  * Main loop, BQL held; meant for when the game is paused or exiting.  For
  * every name with more than one snapshot, keep the newest loadable one and
- * delete the rest with their files.  Returns how many were deleted.
+ * delete the rest with their files; then delete state files that belong to
+ * no snapshot.  Returns how many snapshots and files were deleted.
  */
 int xemu_fast_prune(const char *dir)
 {
@@ -3558,6 +3616,9 @@ int xemu_fast_prune(const char *dir)
         return 0;
     }
     n = bdrv_snapshot_list(bs, &tab);
+    if (n < 0) {
+        return 0;               /* no list: nothing can be judged an orphan */
+    }
     g_autofree bool *keep = g_new0(bool, n > 0 ? n : 1);
     g_autofree bool *dup = g_new0(bool, n > 0 ? n : 1);
 
@@ -3579,6 +3640,7 @@ int xemu_fast_prune(const char *dir)
         }
         keep[i] = !newer_kept && xstate_loadable(dir, &tab[i]);
     }
+    g_autofree bool *alive = g_new0(bool, n > 0 ? n : 1);
     bdrv_drain_all_begin();
     bdrv_graph_rdlock_main_loop();
     for (int i = 0; i < n; i++) {
@@ -3588,21 +3650,25 @@ int xemu_fast_prune(const char *dir)
         }
         /* Never delete the last of a name, even an unloadable one. */
         if (!dup[i] || keep[i] || !any_kept) {
+            alive[i] = true;
             continue;
         }
         g_autofree char *path = xstate_path(dir, &tab[i]);
         unlink(path);
         if (bdrv_snapshot_delete(bs, tab[i].id_str, NULL, NULL) == 0) {
             deleted++;
+        } else {
+            alive[i] = true;    /* still there: keep its file */
         }
     }
     bdrv_graph_rdunlock_main_loop();
     bdrv_drain_all_end();
+    int orphans = xstate_prune_orphans(dir, tab, alive, n);
     g_free(tab);
     xs_prune_needed = false;
-    fprintf(stderr, "fast-save: pruned %d old snapshot(s) in %.1f ms\n",
-            deleted, (get_clock() - t0) / 1e6);
-    return deleted;
+    fprintf(stderr, "fast-save: pruned %d old snapshot(s), %d orphan file(s) "
+            "in %.1f ms\n", deleted, orphans, (get_clock() - t0) / 1e6);
+    return deleted + orphans;
 }
 
 /*
