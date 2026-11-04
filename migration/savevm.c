@@ -211,6 +211,17 @@ static int get_timer(QEMUFile *f, void *pv, size_t size,
                      const VMStateField *field)
 {
     QEMUTimer *v = pv;
+#if defined(__ANDROID__) || defined(ANDROID)
+    if (!v->timer_list) {
+        /* Never timer_init'ed in this VM: arming it dereferences a NULL timer
+         * list (a crash loading an auto-capture, FINDINGS CS).  Name it and
+         * leave it unarmed. */
+        int64_t expire = (int64_t)qemu_get_be64(f);
+        fprintf(stderr, "vmstate: timer '%s' was never initialised; saved "
+                "expiry %" PRId64 " not armed\n", field->name, expire);
+        return 0;
+    }
+#endif
     timer_get(f, v);
     return 0;
 }

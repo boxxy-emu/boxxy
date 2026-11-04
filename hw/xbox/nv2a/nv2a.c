@@ -706,6 +706,6 @@ void nv2a_init(PCIBus *bus, int devfn, MemoryRegion *ram)
     NV2AState *d = NV2A_DEVICE(dev);
     nv2a_init_memory(d, ram);
     nv2a_init_vga(d);
-    ptimer_init(d);
+    nv2a_ptimer_init(d);
     qemu_add_vm_change_state_handler(nv2a_vm_state_change, d);
 }

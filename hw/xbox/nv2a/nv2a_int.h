@@ -310,7 +310,7 @@ bool pfifo_exclude_pusher(NV2AState *d);
 hwaddr nv_clip_gpu_tile_blit(NV2AState *d, hwaddr blit_base_address,
                              hwaddr len);
 
-void ptimer_init(NV2AState *d);
+void nv2a_ptimer_init(NV2AState *d);
 void ptimer_reset(NV2AState *d);
 
 #endif

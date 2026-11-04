@@ -64,7 +64,13 @@ void ptimer_reset(NV2AState *d)
     timer_del(&d->ptimer.timer);
 }
 
-void ptimer_init(NV2AState *d)
+/*
+ * Not "ptimer_init": QEMU's generic hw/core/ptimer.c exports that name too.
+ * The Android link (--allow-multiple-definition, libsystem.a first) bound
+ * nv2a's call to the generic one, so this timer was never initialised: every
+ * snapshot saved it "armed" at 0 and loading one crashed (FINDINGS CS).
+ */
+void nv2a_ptimer_init(NV2AState *d)
 {
     timer_init_ns(&d->ptimer.timer, QEMU_CLOCK_VIRTUAL, ptimer_alarm_fired, d);
     ptimer_reset(d);
