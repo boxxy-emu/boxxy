@@ -5522,3 +5522,13 @@ generated code, 22% libxemu.  Guest PCs are flat, top block 3% of JIT time, top
 `qht_lookup_custom` ~6% of vCPU time (the known `ret` lookup cost, BV/BW),
 `helper_fnstsw` ~1.5%, `tlb_reset_dirty` ~1%.  No new hotspot: the same
 "game's own work" picture as BP, with no single cheap lever.
+
+**Cycle profile, slowdown run** (2026-11-08, after the user set perf_harden=0;
+cyc2: 28 frames > 45 ms, cpu-cycles on the vCPU, framelog split with
+`guest-pc-split.py`): the expensive frames run the *same* guest pages in the
+same proportions as the cheap ones (top pages 3-7% each, no page unique to
+slow frames).  Host side unchanged from cpu-clock: lookup_tb_ptr + qht ~6.6%
+of vCPU cycles, softmmu slow-path loads (`helper_ldul_mmu`) ~1.4%, TLB refill
+(`tlb_set_page_with_attrs`, `x86_cpu_tlb_fill`, `g_tree_find_node`,
+`address_space_translate_for_iotlb`) ~2.5%, `fnstsw` ~1.3%, `tlb_reset_dirty`
+~1.1%.  Slow frames are more of the same work (catch-up ticks), confirmed.
