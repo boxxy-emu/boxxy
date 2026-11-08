@@ -38,17 +38,6 @@ Boxxy is in active development. It is developed and tested on an **AYN Thor**
 (Snapdragon 8 Gen 2, dual screen). Other devices should work if they meet the
 requirements below, but they are untested.
 
-These games boot and play on the Thor:
-
-| Game | Notes |
-|---|---|
-| Halo: Combat Evolved | Main test title. Playable; heavy scenes can still dip. |
-| Halo 2 | |
-| Jade Empire | |
-| Metal Gear Solid 2: Substance | |
-| Jet Set Radio Future | |
-| Tony Hawk's Pro Skater 2x | |
-
 For wider compatibility, xemu's [compatibility list](https://xemu.app/#compatibility)
 is a useful guide to what the emulator core can run. Expect lower speeds on
 Android than on a desktop PC.
