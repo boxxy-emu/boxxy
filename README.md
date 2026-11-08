@@ -38,9 +38,10 @@ Boxxy is in active development. It is developed and tested on an **AYN Thor**
 (Snapdragon 8 Gen 2, dual screen). Other devices should work if they meet the
 requirements below, but they are untested.
 
-For wider compatibility, xemu's [compatibility list](https://xemu.app/#compatibility)
-is a useful guide to what the emulator core can run. Expect lower speeds on
-Android than on a desktop PC.
+Boxxy uses xemu's emulation core, so game compatibility should generally follow
+xemu's [compatibility list](https://xemu.app/#compatibility). Many games have
+not been tested on Boxxy yet, though, and speeds on Android will be lower than
+on a desktop PC.
 
 ## Features
 
