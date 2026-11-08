@@ -5493,3 +5493,32 @@ register inside Turnip was not identified.
 New diagnostic: `debug.xemu.tu_debug` sets TU_DEBUG for a custom driver
 (Mesa reads the environment; an app cannot set `mesa.*` properties).
 Verify with logcat `TU: TU_DEBUG=0x...`.
+
+## CV. USER SLOT 1 (2026-11-08) + HELD FIRE: BURSTS OF PLAIN vCPU OVERLOAD, NOT REPRODUCIBLE ON DEMAND
+
+The user's quick slot 1 (Halo, corridor with an enemy, assault rifle) feels
+slow, worse with the trigger held.  Harness: load slot 1, replay a recording
+that holds the right trigger (`AXIS,1,32767`), BENCHMARK from 1 s later.
+
+| run | input | frames | vCPU ms/frame | frames > 45 ms | CPU temp |
+|---|---|---|---|---|---|
+| base1 | none | 600 | 19.3 | 3 | 56 C |
+| fire1 | RT held 25 s | 600 | 26.7 | 6 | 61 C |
+| fire50 | RT held 50 s | 1400 | 17.3 | 25 | 61 C |
+| pfire | RT held | 450 | 24.4 | 3 | 63 C |
+| pfire2 | RT held | 900 | 21.4 | 2 | 63 C |
+
+Holding fire adds ~5-7 ms/frame of guest CPU work.  Only fire50 slowed
+down visibly: about 9 s at ~24 fps, almost all frames 50 ms with 0 halts and
+the vCPU on-CPU ~48 ms (Halo running catch-up ticks, as in BO/CE).  The other
+three firing runs stayed at 30 fps.  Same save, same input, different
+outcome, so the combat itself (AI/physics) varies run to run.  Not heat (56-63
+C here; throttling starts near 92).
+
+**Profile during firing** (pfire2, simpleperf cpu-clock on the vCPU, 74,560
+samples; hardware counters unavailable without lowering perf_harden): 74%
+generated code, 22% libxemu.  Guest PCs are flat, top block 3% of JIT time, top
+64 KB region 13% (game `.text`).  Host side: `helper_lookup_tb_ptr` +
+`qht_lookup_custom` ~6% of vCPU time (the known `ret` lookup cost, BV/BW),
+`helper_fnstsw` ~1.5%, `tlb_reset_dirty` ~1%.  No new hotspot: the same
+"game's own work" picture as BP, with no single cheap lever.
