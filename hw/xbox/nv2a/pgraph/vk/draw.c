@@ -2003,6 +2003,26 @@ static float clamp_line_width_to_device_limits(PGRAPHState *pg, float width)
     return fminf(fmaxf(min_width, width), max_width);
 }
 
+/*
+ * Turnip (Mesa 26.x, Adreno 740) drops a blend-constant update that matches
+ * the value it last recorded, but the register can have been overwritten
+ * since: draws using CONSTANT_COLOR then blend with a stale constant.  Halo's
+ * ammo bars (src factor CONSTANT_COLOR) vanished in ~1 frame in 5 this way,
+ * except as the first draw of a submit, where Turnip re-sends all state.
+ * Setting a different value first forces the real one out (FINDINGS CU).
+ */
+static void set_blend_constants(PGRAPHVkState *r, const float c[4])
+{
+    if (r->blend_constants_resend &&
+        !memcmp(c, r->blend_constants, sizeof(r->blend_constants))) {
+        const float other[4] = { c[0] == 0.0f ? 1.0f : 0.0f, c[1], c[2],
+                                 c[3] };
+        vkCmdSetBlendConstants(r->command_buffer, other);
+    }
+    vkCmdSetBlendConstants(r->command_buffer, c);
+    memcpy(r->blend_constants, c, sizeof(r->blend_constants));
+}
+
 static void begin_draw(PGRAPHState *pg)
 {
     PGRAPHVkState *r = pg->vk_renderer_state;
@@ -2088,7 +2108,7 @@ static void begin_draw(PGRAPHState *pg)
         float blend_constant[4];
         pgraph_argb_pack32_to_rgba_float(
             pgraph_reg_r(pg, NV_PGRAPH_BLENDCOLOR), blend_constant);
-        vkCmdSetBlendConstants(r->command_buffer, blend_constant);
+        set_blend_constants(r, blend_constant);
 
         bind_descriptor_sets(pg);
         push_vertex_attr_values(pg);
@@ -2341,7 +2361,7 @@ void pgraph_vk_clear_surface(NV2AState *d, uint32_t parameter)
             float blend_constants[4];
             pgraph_get_clear_color(pg, blend_constants);
             vkCmdSetScissor(r->command_buffer, 0, 1, &clear_rect.rect);
-            vkCmdSetBlendConstants(r->command_buffer, blend_constants);
+            set_blend_constants(r, blend_constants);
             vkCmdDraw(r->command_buffer, 3, 1, 0, 0);
         }
     }

@@ -20,6 +20,9 @@
 #include "qemu/osdep.h"
 #include "ui/xemu-settings.h"
 #include "renderer.h"
+#ifdef __ANDROID__
+#include <sys/system_properties.h>
+#endif
 #include "xemu-version.h"
 
 #ifdef __ANDROID__
@@ -553,6 +556,20 @@ static bool select_physical_device(PGRAPHState *pg, Error **errp)
     }
 
     vkGetPhysicalDeviceProperties(r->physical_device, &r->device_props);
+    r->blend_constants_resend =
+        !strncmp(r->device_props.deviceName, "Turnip", 6);
+#ifdef __ANDROID__
+    {
+        /* debug.xemu.vk_blend_resend: 0 = never, 1 = always, else Turnip */
+        char v[PROP_VALUE_MAX] = "";
+        __system_property_get("debug.xemu.vk_blend_resend", v);
+        if (v[0] == '0' || v[0] == '1') {
+            r->blend_constants_resend = v[0] == '1';
+        }
+        fprintf(stderr, "vk: resend unchanged blend constants: %d\n",
+                r->blend_constants_resend);
+    }
+#endif
     xemu_settings_set_string(&g_config.display.vulkan.preferred_physical_device,
                              r->device_props.deviceName);
     r->vk_api_version = MIN(r->vk_api_version, r->device_props.apiVersion);

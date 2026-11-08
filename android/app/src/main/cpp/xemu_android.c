@@ -867,6 +867,15 @@ PFN_vkGetInstanceProcAddr xemu_android_get_vk_proc_addr(void) {
         return NULL;  /* no custom driver configured — use system loader */
     }
 
+    /* Turnip's debug flags (e.g. sysmem, nolrz, syncdraw): Mesa reads
+     * TU_DEBUG from the environment at instance creation, and an app
+     * cannot set the mesa.* property it would otherwise fall back to. */
+    char tu_debug[PROP_VALUE_MAX] = "";
+    if (__system_property_get("debug.xemu.tu_debug", tu_debug) > 0) {
+        setenv("TU_DEBUG", tu_debug, 1);
+        LOGI("TU_DEBUG=%s", tu_debug);
+    }
+
     void *handle = adrenotools_open_libvulkan(
         RTLD_NOW | RTLD_LOCAL,
         ADRENOTOOLS_DRIVER_CUSTOM,

@@ -4082,7 +4082,7 @@ vertex pages, UBO / inline / staging data changing before submit (all
 identical at submit; staging memory is coherent), 16-byte inline alignment,
 render-pass restart, descriptor rewrite, full ALL_COMMANDS memory barrier,
 fresh framebuffer, aux submits in between. A submit right *before* the draw
-fixes it 100%; right after does not. Not resolved; the stock driver is
+fixes it 100%; right after does not. (Resolved in CU: a dropped blend-constant update.) The stock driver is
 correct. Turnip saves ~3% CPU with no fps change (AI), so the stock driver
 costs little.
 
@@ -5437,3 +5437,41 @@ is a *.xstate.tmp with no write in flight.  A name the disk has no snapshot
 of is left alone (it may belong to another HDD image), and nothing is judged
 if the snapshot list cannot be read.  Tested with planted files: a stale
 date of a known name and the .tmp were removed, an unknown name kept, 2.1 ms.
+
+## CU. THE TURNIP AMMO-BAR FLICKER (BN) WAS A DROPPED BLEND-CONSTANT UPDATE (2026-11-07)
+
+BN left Halo's ammo bars blinking out on Turnip only.  The user hit it again
+(slot 8, plasma rifle, no camo).  Repro: load slot 8, screenshot the top
+screen N times, count lit bar pixels (scratchpad `ammo/sample.sh`).
+
+| Driver | Bars shown |
+|---|---|
+| Qualcomm stock | 100 / 100 |
+| Turnip 26.3.0-R3 (user's) | 54-63 / 80, 16-19 / 20 |
+| Turnip 26.3.0-R5, 26.2.0-R4, mrpurple T30 | same flicker |
+
+**Cause.** The bars' draw has `NV_PGRAPH_BLEND` 0x4ca: source factor
+CONSTANT_COLOR.  We set the blend constant (dynamic state) before every draw,
+but Turnip drops an update equal to the value it last recorded, while the GPU
+register has been overwritten since.  The draw then blends with a stale
+constant and adds nothing.  The first draw of a submit is immune because
+Turnip re-sends all state there, which is why BN's "submit before the draw"
+fixed it.  Proof, in one process, toggled live: setting a dummy constant
+before the real one, 80/80 shown vs 54/80 without.
+
+**Fix** (`vk/draw.c` `set_blend_constants`): on Turnip (device name), an
+update equal to the last value set is preceded by a different value.  A/B
+in separate processes: 80/80 vs 63/80.  `debug.xemu.vk_blend_resend` = 0/1
+forces it off/on.  Cost not measured: one extra command per unchanged draw,
+Turnip only.
+
+**Ruled out on the way**, each at 40-80 samples on R3: TU_DEBUG `sysmem`,
+`nolrz`, `syncdraw`, `flushall`, `flushall,syncdraw` (so not binning, LRZ,
+caches or sync); uniform attrs via UBO instead of push constants; drawing
+the bars (a 4-vertex TRIANGLE_FAN, triangles GS) as a plain triangle list;
+making the clear pipelines' blend constants dynamic.  What overwrites the
+register inside Turnip was not identified.
+
+New diagnostic: `debug.xemu.tu_debug` sets TU_DEBUG for a custom driver
+(Mesa reads the environment; an app cannot set `mesa.*` properties).
+Verify with logcat `TU: TU_DEBUG=0x...`.
