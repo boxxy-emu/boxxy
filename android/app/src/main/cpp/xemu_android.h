@@ -117,6 +117,9 @@ void xemu_android_benchmark_start(int frames);
 /* Skip the Xbox startup animation; must be set before qemu_init(). */
 void xemu_android_set_skip_boot_anim(bool enabled);
 
+/* NAT networking and the guest's upstream DNS server; before qemu_init(). */
+void xemu_android_set_network(bool enabled, const char *dns);
+
 /* Voice-processing worker threads; read once at startup, negative = default. */
 void xemu_android_set_voice_workers(int n);
 

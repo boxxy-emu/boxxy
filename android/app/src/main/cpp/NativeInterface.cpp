@@ -300,6 +300,16 @@ Java_com_boxxy_NativeInterface_setSkipBootAnim(JNIEnv *env, jclass clazz,
 }
 
 JNIEXPORT void JNICALL
+Java_com_boxxy_NativeInterface_setNetwork(JNIEnv *env, jclass clazz,
+                                         jboolean enabled, jstring dns) {
+    const char *d = dns ? env->GetStringUTFChars(dns, nullptr) : nullptr;
+    xemu_android_set_network((bool)enabled, d);
+    if (d) {
+        env->ReleaseStringUTFChars(dns, d);
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_boxxy_NativeInterface_setVoiceWorkers(JNIEnv *env, jclass clazz,
                                               jint n) {
     xemu_android_set_voice_workers((int)n);

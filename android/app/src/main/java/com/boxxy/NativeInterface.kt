@@ -226,6 +226,13 @@ object NativeInterface {
     external fun setSkipBootAnim(enabled: Boolean)
 
     /**
+     * Networking for the emulated Xbox (NAT), and the upstream DNS server its
+     * automatic DNS resolves through (an IPv4 address).  Read when the machine
+     * is created: set before [startEmulation].
+     */
+    external fun setNetwork(enabled: Boolean, dns: String)
+
+    /**
      * Number of voice-processing worker threads (0 = process synchronously on
      * the APU thread).  Read once when the APU starts, so this must be set
      * before [startEmulation]; changing it later has no effect.

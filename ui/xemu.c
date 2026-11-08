@@ -284,6 +284,24 @@ void xemu_android_set_skip_boot_anim(bool enabled)
     g_android_skip_boot_anim = enabled;
 }
 
+/*
+ * Networking (NAT through libslirp).  Off unless the app turns it on.  The
+ * DNS server is the upstream for the guest's virtual nameserver (10.0.2.3):
+ * Android has no resolv.conf, so libslirp reads it from SLIRP_DNS (patched,
+ * subprojects/packagefiles/slirp/android-dns.patch).
+ */
+int g_android_net = -1;
+
+void xemu_android_set_network(bool enabled, const char *dns)
+{
+    g_android_net = enabled;
+    if (dns && *dns) {
+        setenv("SLIRP_DNS", dns, 1);
+    } else {
+        unsetenv("SLIRP_DNS");
+    }
+}
+
 int g_android_voice_workers = -1;
 
 void xemu_android_set_voice_workers(int n)
@@ -4481,6 +4499,26 @@ int xemu_core_main(int argc, char **argv)
         ALOGI("Boot: skip startup animation = %s",
               g_android_skip_boot_anim ? "yes" : "no");
         g_config.general.skip_boot_anim = g_android_skip_boot_anim;
+    }
+
+    if (g_android_net >= 0) {
+        const char *dns = getenv("SLIRP_DNS");
+        ALOGI("Network: %s (NAT, DNS %s)", g_android_net ? "on" : "off",
+              dns ? dns : "none");
+        g_config.net.enable = g_android_net;
+        g_config.net.backend = CONFIG_NET_BACKEND_NAT;
+
+        /* Diagnostic: debug.xemu.net_fwd=HOST:GUEST forwards one TCP port
+         * of this device to the guest (e.g. 2121:21 for an FTP server). */
+        char v[PROP_VALUE_MAX] = "";
+        static struct forward_ports fwd;
+        if (__system_property_get("debug.xemu.net_fwd", v) > 0 &&
+            sscanf(v, "%d:%d", &fwd.host, &fwd.guest) == 2) {
+            fwd.protocol = CONFIG_NET_NAT_FORWARD_PORTS_PROTOCOL_TCP;
+            g_config.net.nat.forward_ports = &fwd;
+            g_config.net.nat.forward_ports_count = 1;
+            ALOGI("Network: forwarding TCP %d -> guest %d", fwd.host, fwd.guest);
+        }
     }
 
     if (g_android_voice_workers >= 0) {

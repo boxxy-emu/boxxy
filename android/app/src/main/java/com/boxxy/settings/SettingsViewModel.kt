@@ -208,6 +208,26 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putBoolean("skip_boot_anim", value).apply()
     }
 
+    // ── Network ───────────────────────────────────────────────────────────────
+
+    private val _networkEnabled = MutableStateFlow(prefs.getBoolean("network_enabled", false))
+    val networkEnabled: StateFlow<Boolean> = _networkEnabled
+
+    /** Read when the machine is created, so this takes effect on next launch. */
+    fun setNetworkEnabled(value: Boolean) {
+        _networkEnabled.value = value
+        prefs.edit().putBoolean("network_enabled", value).apply()
+    }
+
+    /** "insignia" or "network": where the Xbox's automatic DNS resolves. */
+    private val _networkDns = MutableStateFlow(prefs.getString("network_dns", "insignia") ?: "insignia")
+    val networkDns: StateFlow<String> = _networkDns
+
+    fun setNetworkDns(value: String) {
+        _networkDns.value = value
+        prefs.edit().putString("network_dns", value).apply()
+    }
+
     // ── Audio ─────────────────────────────────────────────────────────────────
 
     private val _hrtf = MutableStateFlow(prefs.getBoolean("audio_hrtf", false))

@@ -64,6 +64,14 @@ fun SettingsScreen(navController: NavController) {
             }
             item {
                 SettingsGroupRow(
+                    icon = Icons.Outlined.Language,
+                    title = "Network",
+                    subtitle = "Online play (Insignia)",
+                    onClick = { navController.navigate("settings/network") },
+                )
+            }
+            item {
+                SettingsGroupRow(
                     icon = Icons.Outlined.VolumeUp,
                     title = "Audio",
                     subtitle = "Audio settings",

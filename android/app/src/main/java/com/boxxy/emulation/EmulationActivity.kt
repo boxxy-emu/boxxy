@@ -1717,6 +1717,7 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
         /* Both are read while the machine is built; must precede startEmulation(). */
         NativeInterface.setSkipBootAnim(mainPrefs.getBoolean("skip_boot_anim", false))
         NativeInterface.setVoiceWorkers(mainPrefs.getInt("audio_voice_workers", 2))
+        NativeInterface.setNetwork(mainPrefs.getBoolean("network_enabled", false), networkDns())
 
         playingSinceMs = System.currentTimeMillis()
         if (intent.getBooleanExtra(EXTRA_QUICK_RESUME, false)) {
@@ -1735,6 +1736,19 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
             driverDir,
             driverName
         )
+    }
+
+    /**
+     * The upstream DNS server for the Xbox's automatic DNS: Insignia's, or the
+     * device's current network's (first IPv4 resolver; 1.1.1.1 if it has none).
+     */
+    private fun networkDns(): String {
+        if (mainPrefs.getString("network_dns", "insignia") == "insignia") {
+            return com.boxxy.settings.INSIGNIA_DNS
+        }
+        val cm = getSystemService(android.net.ConnectivityManager::class.java)
+        val servers = cm?.getLinkProperties(cm.activeNetwork)?.dnsServers.orEmpty()
+        return servers.firstOrNull { it is java.net.Inet4Address }?.hostAddress ?: "1.1.1.1"
     }
 
     private fun getCachedOrCopy(uriStr: String, fileName: String): String {

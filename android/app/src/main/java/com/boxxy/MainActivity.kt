@@ -198,6 +198,9 @@ class MainActivity : ComponentActivity() {
                     composable("settings/controls") {
                         ControlsSettingsScreen(navController, settingsViewModel)
                     }
+                    composable("settings/network") {
+                        NetworkSettingsScreen(navController, settingsViewModel)
+                    }
                     composable("settings/audio") {
                         AudioSettingsScreen(navController)
                     }

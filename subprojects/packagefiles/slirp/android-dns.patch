@@ -1,0 +1,45 @@
+diff --git a/src/slirp.c b/src/slirp.c
+index f26c987..59368c2 100644
+--- a/src/slirp.c
++++ b/src/slirp.c
+@@ -358,7 +358,39 @@ int get_dns6_addr(struct in6_addr *pdns6_addr, uint32_t *scope_id)
+                                   scope_id, &dns6_scope_id, &dns6_addr_time);
+ }
+ 
+-#else // !defined(_WIN32) && !defined(__APPLE__)
++#elif defined(__ANDROID__)
++
++/*
++ * Android has no resolv.conf, and an app cannot read the system's resolver
++ * settings from native code.  The embedding app passes the upstream DNS
++ * server for the guest's virtual nameserver in SLIRP_DNS ("a.b.c.d"; only
++ * the first of a comma-separated list is used).  Read on every lookup, so
++ * the app can change it while running.
++ */
++int get_dns_addr(struct in_addr *pdns_addr)
++{
++    const char *env = getenv("SLIRP_DNS");
++    char buf[INET_ADDRSTRLEN];
++    size_t n;
++
++    if (!env || !*env) {
++        return -1;
++    }
++    n = strcspn(env, ",");
++    if (n >= sizeof(buf)) {
++        return -1;
++    }
++    memcpy(buf, env, n);
++    buf[n] = '\0';
++    return inet_pton(AF_INET, buf, pdns_addr) == 1 ? 0 : -1;
++}
++
++int get_dns6_addr(struct in6_addr *pdns6_addr, uint32_t *scope_id)
++{
++    return -1;
++}
++
++#else // !defined(_WIN32) && !defined(__APPLE__) && !defined(__ANDROID__)
+ 
+ #if defined(__HAIKU__)
+ #define RESOLV_CONF_PATH "/boot/system/settings/network/resolv.conf"
