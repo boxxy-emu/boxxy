@@ -2004,16 +2004,20 @@ static float clamp_line_width_to_device_limits(PGRAPHState *pg, float width)
 }
 
 /*
- * Turnip (Mesa 26.x, Adreno 740) drops a blend-constant update that matches
- * the value it last recorded, but the register can have been overwritten
- * since: draws using CONSTANT_COLOR then blend with a stale constant.  Halo's
- * ammo bars (src factor CONSTANT_COLOR) vanished in ~1 frame in 5 this way,
- * except as the first draw of a submit, where Turnip re-sends all state.
+ * Turnip (Mesa 26.x) loses the blend constant across a pipeline built for a
+ * render pass without colour attachments.  Such a pipeline replaces the
+ * blend-constant draw state with zeros, but Mesa's dynamic-state tracking
+ * still holds the app's last value, so a later vkCmdSetBlendConstants with
+ * that same value is dropped as unchanged and the zeros stay.  Draws using
+ * CONSTANT_COLOR then add nothing: Halo's ammo bars vanished ~1 frame in 5
+ * (the first draw of a submit was immune; Turnip re-sends all state there).
  * Setting a different value first forces the real one out (FINDINGS CU).
  */
 static void set_blend_constants(PGRAPHVkState *r, const float c[4])
 {
-    if (r->blend_constants_resend &&
+    bool resend = r->blend_constants_resend == 2 ||
+                  (r->blend_constants_resend == 1 && r->blend_constants_stale);
+    if (resend &&
         !memcmp(c, r->blend_constants, sizeof(r->blend_constants))) {
         const float other[4] = { c[0] == 0.0f ? 1.0f : 0.0f, c[1], c[2],
                                  c[3] };
@@ -2021,6 +2025,11 @@ static void set_blend_constants(PGRAPHVkState *r, const float c[4])
     }
     vkCmdSetBlendConstants(r->command_buffer, c);
     memcpy(r->blend_constants, c, sizeof(r->blend_constants));
+    /* Values set while the no-colour pipeline is bound never reach its draw
+     * state, so only a set under a colour pipeline clears the risk. */
+    if (r->color_binding) {
+        r->blend_constants_stale = false;
+    }
 }
 
 static void begin_draw(PGRAPHState *pg)
@@ -2060,6 +2069,9 @@ static void begin_draw(PGRAPHState *pg)
         vkCmdBindPipeline(r->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           r->pipeline_binding->pipeline);
         r->pipeline_binding->draw_time = pg->draw_time;
+        if (!r->color_binding) {
+            r->blend_constants_stale = true;
+        }
 
         unsigned int vp_width = pg->surface_binding_dim.width,
                      vp_height = pg->surface_binding_dim.height;

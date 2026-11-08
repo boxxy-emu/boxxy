@@ -557,14 +557,15 @@ static bool select_physical_device(PGRAPHState *pg, Error **errp)
 
     vkGetPhysicalDeviceProperties(r->physical_device, &r->device_props);
     r->blend_constants_resend =
-        !strncmp(r->device_props.deviceName, "Turnip", 6);
+        !strncmp(r->device_props.deviceName, "Turnip", 6) ? 1 : 0;
 #ifdef __ANDROID__
     {
-        /* debug.xemu.vk_blend_resend: 0 = never, 1 = always, else Turnip */
+        /* debug.xemu.vk_blend_resend: 0 off, 1 after a no-colour pipeline,
+         * 2 every unchanged value; unset = 1 on Turnip, else 0 */
         char v[PROP_VALUE_MAX] = "";
         __system_property_get("debug.xemu.vk_blend_resend", v);
-        if (v[0] == '0' || v[0] == '1') {
-            r->blend_constants_resend = v[0] == '1';
+        if (v[0] >= '0' && v[0] <= '2') {
+            r->blend_constants_resend = v[0] - '0';
         }
         fprintf(stderr, "vk: resend unchanged blend constants: %d\n",
                 r->blend_constants_resend);

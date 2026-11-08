@@ -5450,20 +5450,38 @@ screen N times, count lit bar pixels (scratchpad `ammo/sample.sh`).
 | Turnip 26.3.0-R3 (user's) | 54-63 / 80, 16-19 / 20 |
 | Turnip 26.3.0-R5, 26.2.0-R4, mrpurple T30 | same flicker |
 
-**Cause.** The bars' draw has `NV_PGRAPH_BLEND` 0x4ca: source factor
-CONSTANT_COLOR.  We set the blend constant (dynamic state) before every draw,
-but Turnip drops an update equal to the value it last recorded, while the GPU
-register has been overwritten since.  The draw then blends with a stale
-constant and adds nothing.  The first draw of a submit is immune because
-Turnip re-sends all state there, which is why BN's "submit before the draw"
-fixed it.  Proof, in one process, toggled live: setting a dummy constant
-before the real one, 80/80 shown vs 54/80 without.
+**Cause (found in the Mesa source, then confirmed by experiment).** The
+bars' draw has `NV_PGRAPH_BLEND` 0x4ca: source factor CONSTANT_COLOR, so it
+reads the blend constant, which we set (dynamic state) before every draw.
+Each Halo frame also has a pass with no colour attachment (~1 pipeline bind
+per frame with `color_binding == NULL`).  For a pipeline whose render pass has
+no colour attachments, Turnip ignores the declared dynamic state and bakes
+blend constants of zero into the pipeline's draw state
+(`tu_pipeline_builder_emit_state`, the `dummy_cb` branch), without adding them
+to `static_state_mask`.  So:
 
-**Fix** (`vk/draw.c` `set_blend_constants`): on Turnip (device name), an
-update equal to the last value set is preceded by a different value.  A/B
-in separate processes: 80/80 vs 63/80.  `debug.xemu.vk_blend_resend` = 0/1
-forces it off/on.  Cost not measured: one extra command per unchanged draw,
-Turnip only.
+1. Binding it puts the zeros in the blend-constant draw-state group.
+2. Our `vkCmdSetBlendConstants(X)` for the draws in that pass is recorded by
+   Mesa's common dynamic state (value X, set) but never emitted, because the
+   pipeline owns the group.
+3. Back in a colour pass, binding the normal pipeline does not re-emit the
+   group, and our `vkCmdSetBlendConstants(X)` is dropped by
+   `SET_DYN_ARRAY` as unchanged.  The zeros stay; the bars add nothing.
+
+The blend *enable/equation* group escapes because Turnip re-emits it on every
+subpass change; the blend-constant group has no such condition.  A new
+command buffer resets everything, hence BN's "a submit before the draw fixes
+it".  Details and a suggested driver fix: the Mesa issue draft (2026-11-07).
+
+**Fix** (`vk/draw.c` `set_blend_constants`): on Turnip (device name), after a
+pipeline bind with no colour binding, the first colour-pass update that
+equals the last value is preceded by a different value.  A/B in separate
+processes: 80/80 vs 64/80.  A first version that cleared the flag on the
+next update of any kind did *not* help (63/80 vs 70/80), because the updates
+inside the no-colour pass cleared it, which matches step 2.  Resending every
+unchanged value (`debug.xemu.vk_blend_resend=2`) also works (80/80 vs 63/80).
+`debug.xemu.vk_blend_resend` = 0 off, 1 targeted (default on Turnip), 2
+always.  Cost: one extra command about once per frame.
 
 **Ruled out on the way**, each at 40-80 samples on R3: TU_DEBUG `sysmem`,
 `nolrz`, `syncdraw`, `flushall`, `flushall,syncdraw` (so not binning, LRZ,

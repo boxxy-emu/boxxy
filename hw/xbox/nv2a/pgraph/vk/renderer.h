@@ -389,10 +389,10 @@ typedef struct PGRAPHVkState {
     VkPhysicalDevice physical_device;
     VkPhysicalDeviceFeatures enabled_physical_device_features;
     VkPhysicalDeviceProperties device_props;
-    /* Turnip skips a blend-constant update equal to the value it last
-     * recorded, although something in between has overwritten the GPU
-     * register (FINDINGS CU), so such an update is sent twice. */
-    bool blend_constants_resend;
+    /* Turnip workaround (FINDINGS CU): 0 off, 1 resend an unchanged blend
+     * constant after a pipeline without colour attachments, 2 always. */
+    int blend_constants_resend;
+    bool blend_constants_stale; /* a no-colour pipeline was bound since */
     float blend_constants[4]; /* last value set in the command buffer */
     VkDevice device;
     VmaAllocator allocator;
