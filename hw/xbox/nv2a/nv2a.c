@@ -205,6 +205,39 @@ int nv2a_get_screen_off(void)
     return g_nv2a->vga.sr[VGA_SEQ_CLOCK_MODE] & VGA_SR01_SCREEN_OFF;
 }
 
+#if defined(__ANDROID__) || defined(ANDROID)
+/*
+ * The buffer the CRTC is scanning out, straight from VRAM.  Programs that
+ * draw with the CPU (nxdk homebrew such as Insignia's Setup Assistant) never
+ * make a PGRAPH surface, so nv2a_get_framebuffer_surface() has nothing to
+ * give for them; desktop xemu shows them through the VGA path, which Android
+ * skips.  NULL when the mode can't be shown.
+ */
+const uint8_t *nv2a_get_scanout(int *width, int *height, int *bpp, int *pitch)
+{
+    NV2AState *d = g_nv2a;
+    VGADisplayParams params;
+
+    if (!d || nv2a_get_screen_off()) {
+        return NULL;
+    }
+    d->vga.get_resolution(&d->vga, width, height);
+    d->vga.get_params(&d->vga, &params);
+    *bpp = d->vga.get_bpp(&d->vga);
+    *pitch = params.line_offset;
+    if ((*bpp != 15 && *bpp != 16 && *bpp != 32) ||
+        *width <= 0 || *height <= 0 || *width > 2048 || *height > 2048 ||
+        *pitch < *width * ((*bpp + 7) / 8)) {
+        return NULL;
+    }
+    uint64_t end = d->pcrtc.start + (uint64_t)*pitch * *height;
+    if (end > memory_region_size(d->vram)) {
+        return NULL;
+    }
+    return d->vram_ptr + d->pcrtc.start;
+}
+#endif
+
 static void nv2a_vga_gfx_update(void *opaque)
 {
     VGACommonState *vga = opaque;

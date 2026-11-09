@@ -155,7 +155,16 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
   with the Setup Assistant before connecting). Next: run the Setup Assistant —
   this sends the console's identity to Insignia, so it waits for the user's
   go-ahead.
-- Not yet tested: Setup Assistant boot and registration; account creation;
+- Setup Assistant (2026-11-08): first boot sat on the Xbox logo. It was
+  running; its picture wasn't shown. It is nxdk homebrew (SDL + lvgl) that
+  draws into the framebuffer with the CPU, so the GPU never makes a surface
+  and `nv2a_get_framebuffer_surface()` returns 0, and Android skipped desktop
+  xemu's VGA fallback. Fixed: after 500 ms with no GPU frame, `gl_render_frame`
+  shows the scanout buffer straight from VRAM (`nv2a_get_scanout()`,
+  `scanout_texture()` in `ui/xemu.c`; 15/16/32 bpp, ~10 Hz). Menu verified.
+  Applies to any CPU-drawn homebrew. The HUD's FPS counts GPU frames only, so
+  it reads 0 there.
+- Not yet tested: registration; account creation;
   Halo 2 sign-in and matchmaking.
 
 ## Open items

@@ -3367,6 +3367,78 @@ static void bench_tick(void)
 }
 #endif
 
+#if defined(__ANDROID__) || defined(ANDROID)
+/* When nv2a_get_framebuffer_surface() last gave a texture. */
+static int64_t s_gpu_frame_ms;
+
+/*
+ * The scanout buffer from VRAM as a texture, for programs that draw with the
+ * CPU and so never give nv2a_get_framebuffer_surface() a surface (nxdk
+ * homebrew, Insignia's Setup Assistant).  0 if there is nothing to show.
+ */
+static GLuint scanout_texture(void)
+{
+    static GLuint s_tex;
+    static uint32_t *s_buf;
+    static size_t s_cap;
+    int w, h, bpp, pitch;
+    const uint8_t *src = nv2a_get_scanout(&w, &h, &bpp, &pitch);
+
+    if (!src) {
+        return 0;
+    }
+    if ((size_t)w * h > s_cap) {
+        s_cap = (size_t)w * h;
+        s_buf = g_renew(uint32_t, s_buf, s_cap);
+    }
+    for (int y = 0; y < h; y++) {
+        const uint8_t *row = src + (size_t)pitch * y;
+        /* Bottom row first: the blit samples (0,0) as the Xbox's bottom. */
+        uint8_t *out = (uint8_t *)(s_buf + (size_t)w * (h - 1 - y));
+        for (int x = 0; x < w; x++, out += 4) {
+            unsigned r, g, b;
+            if (bpp == 32) {                /* X8R8G8B8 */
+                b = row[x * 4];
+                g = row[x * 4 + 1];
+                r = row[x * 4 + 2];
+            } else {
+                unsigned v = row[x * 2] | row[x * 2 + 1] << 8;
+                if (bpp == 16) {            /* R5G6B5 */
+                    r = (v >> 11) & 31;
+                    g = (v >> 5) & 63;
+                    g = g << 2 | g >> 4;
+                } else {                    /* X1R5G5B5 */
+                    r = (v >> 10) & 31;
+                    g = (v >> 5) & 31;
+                    g = g << 3 | g >> 2;
+                }
+                b = v & 31;
+                r = r << 3 | r >> 2;
+                b = b << 3 | b >> 2;
+            }
+            out[0] = r;
+            out[1] = g;
+            out[2] = b;
+            out[3] = 255;
+        }
+    }
+    if (!s_tex) {
+        glGenTextures(1, &s_tex);
+        glBindTexture(GL_TEXTURE_2D, s_tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+    glBindTexture(GL_TEXTURE_2D, s_tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, s_buf);
+    return s_tex;
+}
+#endif
+
 static void gl_render_frame(struct xemu_console *scon)
 {
     static int frames = 0;
@@ -3492,6 +3564,7 @@ static void gl_render_frame(struct xemu_console *scon)
         acquired_surface = true;
         s_last_tex = tex;
         if (tex != 0) {
+            s_gpu_frame_ms = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
             s_last_synced_frame_time = cur_frame_time;
             s_last_synced_flips = cur_flips;
             g_rendered_frame_count++;
@@ -3735,16 +3808,24 @@ static void gl_render_frame(struct xemu_console *scon)
     }
 #endif
 
+#if defined(__ANDROID__) || defined(ANDROID)
+    /*
+     * Nothing the GPU drew is being scanned out.  The QEMU software surface
+     * path is skipped (it uses qemu_memfd_alloc, which may produce an invalid
+     * pixman image on Android); show the scanout buffer from VRAM instead,
+     * once the GPU has been quiet for half a second so a game's brief gaps
+     * keep its last frame.  Polled at the miss rate, ~10 Hz.
+     */
+    if (tex == 0 &&
+        qemu_clock_get_ms(QEMU_CLOCK_REALTIME) - s_gpu_frame_ms >= 500) {
+        tex = scanout_texture();
+    }
+#endif
     if (tex == 0) {
         if (!scon->surface) {
                 goto skip_render;
         }
 #if defined(__ANDROID__) || defined(ANDROID)
-        /*
-         * On Android the Xbox renders exclusively via NV2A (nv2a_get_framebuffer_surface).
-         * Skip the QEMU software/placeholder surface path entirely — it uses qemu_memfd_alloc
-         * which may produce an invalid pixman image on Android. Show black until NV2A renders.
-         */
         goto skip_render;
 #endif
         xemu_main_loop_lock();

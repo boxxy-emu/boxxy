@@ -30,5 +30,8 @@ void nv2a_set_surface_scale_factor(unsigned int scale);
 unsigned int nv2a_get_surface_scale_factor(void);
 const uint8_t *nv2a_get_dac_palette(void);
 int nv2a_get_screen_off(void);
+#if defined(__ANDROID__) || defined(ANDROID)
+const uint8_t *nv2a_get_scanout(int *width, int *height, int *bpp, int *pitch);
+#endif
 
 #endif
