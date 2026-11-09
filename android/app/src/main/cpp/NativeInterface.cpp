@@ -321,6 +321,11 @@ Java_com_boxxy_NativeInterface_setDnsRedirect(JNIEnv *env, jclass clazz, jint po
 }
 
 JNIEXPORT void JNICALL
+Java_com_boxxy_NativeInterface_setEjectOnReset(JNIEnv *env, jclass clazz, jboolean enabled) {
+    xemu_android_set_eject_on_reset(enabled);
+}
+
+JNIEXPORT void JNICALL
 Java_com_boxxy_NativeInterface_setVoiceWorkers(JNIEnv *env, jclass clazz,
                                               jint n) {
     xemu_android_set_voice_workers((int)n);

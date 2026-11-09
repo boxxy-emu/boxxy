@@ -467,6 +467,39 @@ static bool pfifo_sync_midstream(void)
 #endif
 }
 
+/*
+ * What the pusher saw when the pushbuffer stopped making sense: the words
+ * around dma_get and the pointers that led there.  Two such aborts were seen
+ * in the 5960 dashboard (XBOX-LIVE.md) with nothing else to go on.
+ */
+static void pfifo_log_bad_pushbuffer(NV2AState *d, const char *what,
+                                     const uint8_t *dma, hwaddr dma_len,
+                                     uint32_t at)
+{
+    fprintf(stderr, "pfifo: %s at 0x%x | put 0x%x len 0x%" HWADDR_PRIx
+            " | jmp shadow 0x%x subroutine 0x%x state 0x%x | rsvd shadow 0x%x"
+            " data shadow 0x%x\n", what, at,
+            qatomic_read(&d->pfifo.regs[NV_PFIFO_CACHE1_DMA_PUT]), dma_len,
+            d->pfifo.regs[NV_PFIFO_CACHE1_DMA_GET_JMP_SHADOW],
+            d->pfifo.regs[NV_PFIFO_CACHE1_DMA_SUBROUTINE],
+            d->pfifo.regs[NV_PFIFO_CACHE1_DMA_STATE],
+            d->pfifo.regs[NV_PFIFO_CACHE1_DMA_RSVD_SHADOW],
+            d->pfifo.regs[NV_PFIFO_CACHE1_DMA_DATA_SHADOW]);
+    if (at >= dma_len) {
+        return;
+    }
+    uint32_t from = at >= 64 ? at - 64 : 0;
+    for (uint32_t a = from & ~3u; a < at + 64 && a + 4 <= dma_len; a += 16) {
+        char line[128];
+        int n = snprintf(line, sizeof(line), "pfifo:   %08x:", a);
+        for (uint32_t k = a; k < a + 16 && k + 4 <= dma_len; k += 4) {
+            n += snprintf(line + n, sizeof(line) - n, "%s%08x",
+                          k == at ? " >" : "  ", ldl_le_p(dma + k));
+        }
+        fprintf(stderr, "%s\n", line);
+    }
+}
+
 static void pfifo_run_pusher(NV2AState *d)
 {
     uint32_t *push0 = &d->pfifo.regs[NV_PFIFO_CACHE1_PUSH0];
@@ -533,6 +566,8 @@ static void pfifo_run_pusher(NV2AState *d)
             break;
         }
         if (dma_get_v >= dma_len) {
+            pfifo_log_bad_pushbuffer(d, "dma_get out of range", dma, dma_len,
+                                     dma_get_v);
             assert(!"Dma value is out of range in PFIFO pusher");
             SET_MASK(*dma_state, NV_PFIFO_CACHE1_DMA_STATE_ERROR,
                      NV_PFIFO_CACHE1_DMA_STATE_ERROR_PROTECTION);
@@ -685,6 +720,21 @@ static void pfifo_run_pusher(NV2AState *d)
             } else {
                 NV2A_DPRINTF("pb reserved cmd 0x%x - 0x%x\n",
                              dma_get_v, word);
+                /*
+                 * Read it again: a word that has since become something else
+                 * was read before the guest's write to it was visible, and
+                 * is worth one more look rather than an abort.
+                 */
+                smp_mb();
+                g_usleep(1000);
+                uint32_t again = ldl_le_p(word_ptr);
+                pfifo_log_bad_pushbuffer(d, again != word ?
+                                         "reserved command, changed on re-read" :
+                                         "reserved command", dma, dma_len,
+                                         dma_get_v - 4);
+                if (again != word) {
+                    continue;   /* dma_get unchanged: the word is read again */
+                }
                 SET_MASK(*dma_state, NV_PFIFO_CACHE1_DMA_STATE_ERROR,
                          NV_PFIFO_CACHE1_DMA_STATE_ERROR_RESERVED_CMD);
                 // break;

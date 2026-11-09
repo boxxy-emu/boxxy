@@ -48,6 +48,8 @@
 #include "ui/kbd-state.h"
 #include "system/runstate.h"
 #include "system/runstate-action.h"
+#include "system/reset.h"
+#include "hw/xbox/smbus.h"
 #include "system/system.h"
 #include "block/block-global-state.h"
 #if defined(__ANDROID__) || defined(ANDROID)
@@ -323,6 +325,45 @@ void xemu_android_set_net_forward(int host_port, int guest_port)
     g_android_fwd.host = host_port;
     g_android_fwd.guest = guest_port;
     g_android_fwd.protocol = CONFIG_NET_NAT_FORWARD_PORTS_PROTOCOL_TCP;
+}
+
+/*
+ * Take the disc out when the guest restarts.  For a tool disc such as
+ * Insignia's Setup Assistant: quitting it resets the console, and with the
+ * disc still in, the BIOS boots it again.  A real console's user would
+ * eject; this boots the dashboard instead.  Only the media is removed, with
+ * no eject-button event (that makes the kernel reset again).
+ */
+static bool g_android_eject_on_reset;
+
+static void eject_after_reset(void *opaque)
+{
+    Error *err = NULL;
+
+    qmp_eject("ide0-cd1", NULL, true, true, &err);
+    if (err) {
+        ALOGE("eject on reset: %s", error_get_pretty(err));
+        error_free(err);
+        return;
+    }
+    xemu_settings_set_string(&g_config.sys.files.dvd_path, "");
+    xbox_smc_update_tray_state();
+    ALOGI("eject on reset: disc removed");
+}
+
+static void eject_on_reset(void *opaque)
+{
+    if (!g_android_eject_on_reset) {
+        return;
+    }
+    g_android_eject_on_reset = false;
+    /* After the reset finishes; the BIOS looks for a disc seconds later. */
+    aio_bh_schedule_oneshot(qemu_get_aio_context(), eject_after_reset, NULL);
+}
+
+void xemu_android_set_eject_on_reset(bool enabled)
+{
+    g_android_eject_on_reset = enabled;
 }
 
 int g_android_voice_workers = -1;
@@ -3483,6 +3524,10 @@ static void gl_render_frame(struct xemu_console *scon)
          * not normally hold BQL, so acquire it here for this one call. */
         bql_lock();
         nv2a_set_surface_scale_factor(xemu_android_get_surface_scale());
+        /* After the machine's first reset, so only guest restarts count. */
+        if (g_android_eject_on_reset) {
+            qemu_register_reset_nosnapshotload(eject_on_reset, NULL);
+        }
         bql_unlock();
         s_scale_applied = true;
     }

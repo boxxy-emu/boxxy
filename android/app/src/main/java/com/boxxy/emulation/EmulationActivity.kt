@@ -1750,6 +1750,9 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
                 NativeInterface.setDnsRedirect(it.port)
             }
         }
+        /* A setup tool disc quits by restarting the Xbox; boot the
+         * dashboard then, not the disc again. */
+        NativeInterface.setEjectOnReset(systemLaunch && isoPath.isNotEmpty())
         if (intent.hasExtra(EXTRA_INSTALL_DASHBOARD)) {
             installPort = java.net.ServerSocket(0, 1,
                 java.net.InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))).use { it.localPort }

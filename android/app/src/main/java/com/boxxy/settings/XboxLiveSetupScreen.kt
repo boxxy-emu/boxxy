@@ -237,8 +237,9 @@ fun XboxLiveSetupScreen(
             ) {
                 StepText(
                     "Boxxy downloads Insignia's Setup Assistant and starts it. Choose " +
-                    "“Register Xbox”, wait for it to say it worked, then exit from " +
-                    "the menu.")
+                    "“Register Xbox” and wait for it to say it worked. “Quit Setup " +
+                    "Assistant” then restarts the Xbox into the dashboard, ready for " +
+                    "step 5.")
                 setupProgress?.let {
                     LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth())
                 }

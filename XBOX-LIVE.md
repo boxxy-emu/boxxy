@@ -172,6 +172,18 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
   it reads 0 there.
 - **Registered (2026-11-08):** with both fixes, the Setup Assistant's
   "Register Xbox" reported "Your Xbox was successfully registered".
+- **Quitting the Setup Assistant** resets the console (SMC), and with the disc
+  still in, the BIOS booted it again. Setup launches of a disc now set
+  `NativeInterface.setEjectOnReset`: the first guest reset removes the media
+  (`qmp_eject`, no eject-button event, which would reset again), so Quit
+  boots the dashboard. Verified.
+- **pfifo aborts in the 5960 dashboard**, twice, after ~15 s and ~70 s idle:
+  "Dma value is out of range" and "Reserved pb command" (upstream asserts
+  the same). Cause unknown. The pusher now logs the words around dma_get
+  and the pointers (`pfifo_log_bad_pushbuffer`, tag `xemu-stdout`), and
+  re-reads a bad word after 1 ms: if it changed, it was read before the
+  guest's write landed (a visibility race) and is processed instead of
+  aborting. Waiting for the next occurrence.
 - Not yet tested: account creation;
   Halo 2 sign-in and matchmaking.
 
