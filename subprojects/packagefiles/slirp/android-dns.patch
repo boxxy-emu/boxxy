@@ -44,7 +44,7 @@ index f26c987..59368c2 100644
  #if defined(__HAIKU__)
  #define RESOLV_CONF_PATH "/boot/system/settings/network/resolv.conf"
 diff --git a/src/socket.c b/src/socket.c
-index fb9c019..bbf10df 100644
+index fb9c019..ac13af6 100644
 --- a/src/socket.c
 +++ b/src/socket.c
 @@ -951,8 +951,49 @@ void sofwdrain(struct socket *so)
@@ -97,3 +97,25 @@ index fb9c019..bbf10df 100644
      if (!s->disable_dns && so->so_faddr.s_addr == s->vnameserver_addr.s_addr) {
          return so->so_fport == htons(53) && get_dns_addr(&sin->sin_addr) >= 0;
      }
+@@ -1025,6 +1066,21 @@ void sotranslate_in(struct socket *so, struct sockaddr_storage *addr)
+ 
+     switch (addr->ss_family) {
+     case AF_INET:
++#if defined(__ANDROID__)
++        /*
++         * A reply from the SLIRP_DNS_REDIRECT resolver: make it come from
++         * the server and port the guest asked.  Strict stub resolvers (lwIP,
++         * in nxdk homebrew such as Insignia's Setup Assistant) drop replies
++         * from any other address or port.
++         */
++        if (so->so_type == IPPROTO_UDP && so->so_fport == htons(53) &&
++            sin->sin_addr.s_addr == loopback_addr.s_addr &&
++            getenv("SLIRP_DNS_REDIRECT")) {
++            sin->sin_addr = so->so_faddr;
++            sin->sin_port = so->so_fport;
++            break;
++        }
++#endif
+         if ((so->so_faddr.s_addr & slirp->vnetwork_mask.s_addr) ==
+             slirp->vnetwork_addr.s_addr) {
+             uint32_t inv_mask = ~slirp->vnetwork_mask.s_addr;

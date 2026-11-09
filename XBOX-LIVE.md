@@ -140,6 +140,12 @@ so it also works when the Xbox's own settings (or the Setup Assistant) name
 46.101.64.175. Patch: `sotranslate_out4` in `src/socket.c`, kept with the
 SLIRP_DNS change in `subprojects/packagefiles/slirp/android-dns.patch`.
 
+Replies are rewritten to come from the server and port the guest asked
+(`sotranslate_in`, same patch). Without that they arrived from
+`10.0.2.3:<resolver port>`: the MS dashboard took them, but lwIP (nxdk, so
+the Setup Assistant) dropped them and retried, and Troubleshoot said "Could
+not resolve DNS query" (found 2026-11-08).
+
 Settings > Network > DNS "This device's network" turns it off (no redirect;
 the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
 
