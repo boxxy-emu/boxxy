@@ -199,6 +199,18 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
     dashboard ran 12 min without an abort, against 25-95 s for the four
     builds before it. Unexplained; may be timing. Next abort's log says
     whether the DSP wrote there.
+  - **Likely mechanism (found during the account sign-up session):** a
+    color surface binding of 1280x960, pitch 5120 (4.9 MB) at 0x3aa4000 /
+    0x3aa8000 reaches 0x3f54000 / 0x3f58000, past the start of the
+    pushbuffer at 0x3f56000. When the CPU writes pushbuffer there,
+    `surface_access_callback` downloads the draw-dirty surface over its whole
+    range first, overwriting pushbuffer already written with pixels
+    (`ff000000` = opaque black; the near-equal 16-bit pairs are pixels, not
+    audio as first guessed). Sizing and callback are upstream's code. Two
+    bindings 16 KB apart can't both be real 4.9 MB buffers, so the size is
+    suspect; the write-back log now prints anti-aliasing, clip and DMA
+    bounds to settle it. The DSP-trace build's quiet run is then most
+    likely chance.
   The diagnostics (pusher trace per method, surface and DSP write checks)
   cost a little on hot paths; take them out once this is understood.
 - Not yet tested: account creation;
