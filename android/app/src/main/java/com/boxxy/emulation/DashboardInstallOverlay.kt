@@ -52,7 +52,7 @@ fun DashboardInstallOverlay(
             if (error != null) {
                 Text(
                     error.replaceFirstChar { it.uppercase() } + ".\n\n" +
-                        "Trying again from Xbox Live setup copies every file again.",
+                        "Trying again from online play setup copies every file again.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             } else {

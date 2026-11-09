@@ -142,7 +142,7 @@ fun XboxLiveSetupScreen(
     val steps = listOf(haveCode, true, dashboardInstalled, registered)
     val current = steps.indexOfFirst { !it }.let { if (it < 0) steps.size else it }
 
-    SettingsSubScreenScaffold("Xbox Live setup", navController) { padding ->
+    SettingsSubScreenScaffold("Online play (Insignia)", navController) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -152,8 +152,9 @@ fun XboxLiveSetupScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Insignia is a free revival of the original Xbox Live. Boxxy does what it " +
-                "can by itself; these are the parts only you can do.",
+                "Insignia is a free community revival of the original Xbox Live, run " +
+                "independently of Microsoft. Boxxy does what it can by itself; these " +
+                "are the parts only you can do.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

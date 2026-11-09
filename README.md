@@ -165,6 +165,8 @@ Boxxy is licensed under the GNU General Public License, version 2, like xemu
 and QEMU. See [`LICENSE`](LICENSE) and [`COPYING`](COPYING). Third-party
 licenses are in [`licenses/`](licenses).
 
-Xbox is a trademark of Microsoft. Boxxy is not affiliated with or endorsed by
-Microsoft. Boxxy does not include any Microsoft software or games; you need
+Xbox and Xbox Live are trademarks of Microsoft. Boxxy is not affiliated with
+or endorsed by Microsoft. Online play uses [Insignia](https://insignia.live), an
+independent revival of the original Xbox Live; Boxxy is not affiliated with
+Insignia either. Boxxy does not include any Microsoft software or games; you need
 your own system files and games.

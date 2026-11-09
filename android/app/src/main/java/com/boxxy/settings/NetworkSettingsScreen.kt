@@ -32,25 +32,26 @@ fun NetworkSettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SettingsSectionLabel("Xbox Live")
+            SettingsSectionLabel("Online play")
             OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        "Play online through Insignia, the revival of the original Xbox " +
-                        "Live. Setup walks you through it and does most of it for you.",
+                        "Play online through Insignia, a community revival of the " +
+                        "original Xbox Live. Setup walks you through it and does most of " +
+                        "it for you.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Button(onClick = { navController.navigate("settings/xboxlive") }) {
-                        Text("Set up Xbox Live")
+                        Text("Set up online play")
                     }
                 }
             }
 
-            SettingsSectionLabel("Online")
+            SettingsSectionLabel("Connection")
             OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(12.dp),
@@ -68,7 +69,7 @@ fun NetworkSettingsScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     val options = listOf(
-                        "insignia" to "Insignia (Xbox Live revival)",
+                        "insignia" to "Insignia",
                         "network" to "This device's network",
                     )
                     SettingsDropdown(
@@ -97,7 +98,7 @@ fun NetworkSettingsScreen(
                 ) {
                     Text(
                         "Start the Xbox with no disc, to check the connection " +
-                        "(Settings > Network Settings) or set up an Xbox Live account.",
+                        "(Settings > Network Settings) or create your Insignia account.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

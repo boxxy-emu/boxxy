@@ -28,7 +28,7 @@ because xemu.toml is rewritten on every launch.
 
 | Need | Source | Boxxy |
 |---|---|---|
-| Network connection | — | **Automatic.** NAT on for Xbox Live setup launches; Settings > Network for games. |
+| Network connection | — | **Automatic.** NAT on for setup launches; Settings > Network for games. |
 | Insignia's DNS for Xbox Live names | insignia.live/connect: primary 46.101.64.175 | **Automatic, built in** (InsigniaDns, below). The Xbox can stay on automatic DNS. |
 | Microsoft dashboard 5960 (`D:1.00.5960.01`) | insignia.live/connect | **User supplies a zip; Boxxy installs it** (DashboardInstaller). Can't be shipped: Microsoft's. |
 | Non-zero HDD key | Insignia guide, "common faults" | **Already true.** xemu generates a random one with the EEPROM (`hw/xbox/eeprom_generation.c:103`). |
@@ -46,7 +46,7 @@ which Boxxy keeps at `filesDir/eeprom.bin`. Clearing app data or reinstalling
 makes a new one, and the console must register again. Not yet handled: a way
 to back up and restore it (open item below).
 
-## The setup screen (Settings > Network > Set up Xbox Live)
+## The setup screen (Settings > Network > Set up online play)
 
 `settings/XboxLiveSetupScreen.kt`. Five steps; the first unfinished one is
 outlined. Opening it turns networking on with Insignia DNS.
@@ -66,7 +66,7 @@ Results that another process writes are files in `filesDir/xboxlive/`
 The screen re-reads them on resume. User ticks are `main_prefs`
 (`xboxlive_have_code`, `xboxlive_have_dashboard`, `xboxlive_registered`).
 
-Xbox Live setup launches (`EXTRA_SYSTEM_LAUNCH`) are always online and never
+Setup launches (`EXTRA_SYSTEM_LAUNCH`) are always online and never
 save Quick Resume; no-disc dashboard launches never do either. A resume point
 of a half-installed disk, or of the dashboard, has no use.
 
@@ -222,7 +222,8 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
 
 `android/app/src/main/cpp/xemu_xboxlive.c`, shown by `XboxLiveLine` in
 `DualScreen.kt` for online sessions: a dot, the gamertag, and Connected /
-Signing in... / Not connected / Sign-in refused. The guest reports none of it:
+Signing in... / Not connected / Sign-in refused, labelled "Insignia". The
+guest reports none of it:
 
 - **Accounts** come from the console's hard disk: a table at byte 0x1800
   (sector 0xC), a 12-byte header (apparently checksum, version, count),
@@ -271,6 +272,15 @@ Asked 2026-11-08: bring the setup into the app rather than separate steps.
 - **Not attempted:** replacing the dashboard sign-up or the Setup Assistant
   with Boxxy code. Both speak Insignia's private protocols; reimplementing
   them would break whenever Insignia changes, and isn't ours to do.
+
+## Naming (2026-11-08)
+
+Xbox and Xbox Live are Microsoft's trademarks, and original Xbox Live closed in
+2010; Boxxy connects to Insignia. So the app names Insignia ("Set up online
+play", "Online play (Insignia)", the status line's "Insignia") and uses "Xbox
+Live" only descriptively ("a revival of the original Xbox Live") or for the
+dashboard's own Xbox Live menu. No Microsoft logos. The README's trademark
+note covers Xbox Live and says Boxxy is not affiliated with Insignia.
 
 ## References
 

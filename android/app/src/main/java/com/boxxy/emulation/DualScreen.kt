@@ -445,7 +445,7 @@ private fun ControllerBanner(state: BottomPanelState, actions: BottomPanelAction
 }
 
 /**
- * Xbox Live, in one line: who, and whether it is connected.  Online sessions
+ * Online play (Insignia), in one line: who, and whether it is connected.  Online sessions
  * only; the status is read off the network (xemu_xboxlive.c):
  * "state\taccount\taccounts".
  */
@@ -469,7 +469,7 @@ private fun XboxLiveLine(status: String) {
         Canvas(Modifier.size(10.dp)) { drawCircle(dot) }
         Spacer(Modifier.width(10.dp))
         Text(
-            "Xbox Live",
+            "Insignia",
             style = MaterialTheme.typography.labelMedium,
             color = scheme.onBackground.copy(alpha = 0.65f),
         )
