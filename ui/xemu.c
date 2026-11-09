@@ -302,6 +302,29 @@ void xemu_android_set_network(bool enabled, const char *dns)
     }
 }
 
+void xemu_android_set_dns_redirect(int port)
+{
+    char v[32];
+    if (port > 0) {
+        snprintf(v, sizeof(v), "127.0.0.1:%d", port);
+        setenv("SLIRP_DNS_REDIRECT", v, 1);
+    } else {
+        unsetenv("SLIRP_DNS_REDIRECT");
+    }
+}
+
+/* One TCP port of this device's loopback forwarded to the guest (the
+ * dashboard installer reaches the guest's FTP server through it); 0 none. */
+static struct forward_ports g_android_fwd;
+bool g_android_net_fwd_loopback;
+
+void xemu_android_set_net_forward(int host_port, int guest_port)
+{
+    g_android_fwd.host = host_port;
+    g_android_fwd.guest = guest_port;
+    g_android_fwd.protocol = CONFIG_NET_NAT_FORWARD_PORTS_PROTOCOL_TCP;
+}
+
 int g_android_voice_workers = -1;
 
 void xemu_android_set_voice_workers(int n)
@@ -4509,10 +4532,17 @@ int xemu_core_main(int argc, char **argv)
         g_config.net.backend = CONFIG_NET_BACKEND_NAT;
 
         /* Diagnostic: debug.xemu.net_fwd=HOST:GUEST forwards one TCP port
-         * of this device to the guest (e.g. 2121:21 for an FTP server). */
+         * of this device to the guest (e.g. 2121:21 for an FTP server),
+         * reachable from the local network. */
         char v[PROP_VALUE_MAX] = "";
         static struct forward_ports fwd;
-        if (__system_property_get("debug.xemu.net_fwd", v) > 0 &&
+        if (g_android_fwd.host > 0) {
+            g_android_net_fwd_loopback = true;
+            g_config.net.nat.forward_ports = &g_android_fwd;
+            g_config.net.nat.forward_ports_count = 1;
+            ALOGI("Network: forwarding TCP 127.0.0.1:%d -> guest %d",
+                  g_android_fwd.host, g_android_fwd.guest);
+        } else if (__system_property_get("debug.xemu.net_fwd", v) > 0 &&
             sscanf(v, "%d:%d", &fwd.host, &fwd.guest) == 2) {
             fwd.protocol = CONFIG_NET_NAT_FORWARD_PORTS_PROTOCOL_TCP;
             g_config.net.nat.forward_ports = &fwd;

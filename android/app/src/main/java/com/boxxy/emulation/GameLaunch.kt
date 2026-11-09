@@ -43,6 +43,22 @@ object GameLaunch {
         }
     }
 
+    /** The Xbox dashboard, for Xbox Live setup: online, no Quick Resume. */
+    fun dashboardIntent(context: Context): Intent? =
+        intentFor(context, "")?.putExtra(EXTRA_SYSTEM_LAUNCH, true)
+
+    /** Install the dashboard in the zip at [zipUri] onto the hard disk. */
+    fun installDashboardIntent(context: Context, zipUri: String): Intent? =
+        intentFor(context, "")?.apply {
+            putExtra(EXTRA_SYSTEM_LAUNCH, true)
+            putExtra(EXTRA_INSTALL_DASHBOARD, zipUri)
+        }
+
+    /** Boot the disc image [file] (Insignia's Setup Assistant), online. */
+    fun systemDiscIntent(context: Context, file: java.io.File): Intent? =
+        intentFor(context, android.net.Uri.fromFile(file).toString())
+            ?.putExtra(EXTRA_SYSTEM_LAUNCH, true)
+
     private fun prefs(context: Context) =
         context.getSharedPreferences("main_prefs", Context.MODE_PRIVATE)
 }

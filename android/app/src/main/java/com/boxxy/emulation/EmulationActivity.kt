@@ -34,6 +34,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp as composeDp
@@ -73,6 +74,18 @@ private const val PANEL_IDLE_MS = 15_000L
 private const val ACTION_PANEL_SLEEP = "com.boxxy.action.PANEL_SLEEP"
 private const val ACTION_SAVE_TEST = "com.boxxy.action.SAVE_TEST"
 private const val ACTION_DELETE_TEST = "com.boxxy.action.DELETE_TEST"
+
+/**
+ * Intent extra: a zip of the Xbox dashboard's files (a content URI) to install
+ * on the hard disk.  The machine boots the dashboard already there and the
+ * files go in through its FTP server (DashboardInstaller); then it exits.
+ */
+const val EXTRA_INSTALL_DASHBOARD = "install_dashboard"
+/**
+ * Intent extra: a launch for Xbox Live setup (the dashboard, the Setup
+ * Assistant) rather than a game -- online, and never a Quick Resume point.
+ */
+const val EXTRA_SYSTEM_LAUNCH = "system_launch"
 
 /** Extras MainActivity uses to start a game once the old emulator is gone. */
 const val EXTRA_RELAUNCH_GAME = "relaunch_game"
@@ -792,6 +805,7 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
                     applyGraphicsSettings()
                     applyAudioSettings()
                     emulationStarted = true
+                    intent.getStringExtra(EXTRA_INSTALL_DASHBOARD)?.let { startDashboardInstall(it) }
                 } else {
                     // Surface recreated after going to background or rotating — hand the
                     // new ANativeWindow to the native layer without restarting emulation.
@@ -897,7 +911,9 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
         super.onNewIntent(newIntent)
         val iso = newIntent.getStringExtra("iso") ?: return
         if (!emulationStarted || isExiting) return
-        if (QuickResume.gameIdFor(iso) == gameId) {
+        if (QuickResume.gameIdFor(iso) == gameId &&
+            !newIntent.hasExtra(EXTRA_INSTALL_DASHBOARD) &&
+            !intent.hasExtra(EXTRA_INSTALL_DASHBOARD)) {
             /* Already further on than any resume point: carry on. */
             showMessage(if (newIntent.getBooleanExtra(EXTRA_QUICK_RESUME, false))
                             "Already playing \u2014 carrying on"
@@ -1604,7 +1620,11 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
 
     // ── Quick resume ──────────────────────────────────────────────────────────
 
+    /* The dashboard and Xbox Live setup are not worth resuming, and a resume
+     * point taken mid-install would bring back a half-written disk. */
     private fun shouldAutoSave(): Boolean =
+        gameId != "dashboard" && !intent.getBooleanExtra(EXTRA_SYSTEM_LAUNCH, false) &&
+        !intent.hasExtra(EXTRA_INSTALL_DASHBOARD) &&
         emulationStarted && !quickResumeLoading && !stateOpInFlight &&
         playingSinceMs != 0L &&
         System.currentTimeMillis() - playingSinceMs >= AUTO_SAVE_MIN_PLAY_MS
@@ -1717,7 +1737,24 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
         /* Both are read while the machine is built; must precede startEmulation(). */
         NativeInterface.setSkipBootAnim(mainPrefs.getBoolean("skip_boot_anim", false))
         NativeInterface.setVoiceWorkers(mainPrefs.getInt("audio_voice_workers", 2))
-        NativeInterface.setNetwork(mainPrefs.getBoolean("network_enabled", false), networkDns())
+        /* Xbox Live setup is online whatever the setting; the installer
+         * also needs the guest's FTP server forwarded to this device. */
+        val systemLaunch = intent.getBooleanExtra(EXTRA_SYSTEM_LAUNCH, false)
+        val online = systemLaunch || mainPrefs.getBoolean("network_enabled", false)
+        NativeInterface.setNetwork(online, networkDns())
+        /* Insignia: Boxxy answers the Xbox's DNS itself (InsigniaDns), so
+         * Xbox Live's names reach Insignia whatever the network does to DNS. */
+        if (online && (systemLaunch || mainPrefs.getString("network_dns", "insignia") == "insignia")) {
+            insigniaDns = com.boxxy.xboxlive.InsigniaDns().also {
+                it.start()
+                NativeInterface.setDnsRedirect(it.port)
+            }
+        }
+        if (intent.hasExtra(EXTRA_INSTALL_DASHBOARD)) {
+            installPort = java.net.ServerSocket(0, 1,
+                java.net.InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))).use { it.localPort }
+            NativeInterface.setNetForward(installPort, 21)
+        }
 
         playingSinceMs = System.currentTimeMillis()
         if (intent.getBooleanExtra(EXTRA_QUICK_RESUME, false)) {
@@ -1738,17 +1775,71 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
         )
     }
 
+    private var insigniaDns: com.boxxy.xboxlive.InsigniaDns? = null
+
     /**
-     * The upstream DNS server for the Xbox's automatic DNS: Insignia's, or the
-     * device's current network's (first IPv4 resolver; 1.1.1.1 if it has none).
+     * The upstream DNS server behind the Xbox's virtual one: the device's
+     * current network's (first IPv4 resolver; 1.1.1.1 if it has none).  With
+     * Insignia on, only DNS over TCP still goes there.
      */
     private fun networkDns(): String {
-        if (mainPrefs.getString("network_dns", "insignia") == "insignia") {
-            return com.boxxy.settings.INSIGNIA_DNS
-        }
         val cm = getSystemService(android.net.ConnectivityManager::class.java)
         val servers = cm?.getLinkProperties(cm.activeNetwork)?.dnsServers.orEmpty()
         return servers.firstOrNull { it is java.net.Inet4Address }?.hostAddress ?: "1.1.1.1"
+    }
+
+    // ── Dashboard install ─────────────────────────────────────────────────────
+
+    private var installPort = 0
+
+    /**
+     * Copy the dashboard in [zipUri] onto the hard disk, over a screen that
+     * hides the old dashboard serving the files, then go back to Boxxy.
+     */
+    private fun startDashboardInstall(zipUri: String) {
+        val progress = mutableFloatStateOf(0f)
+        val status = mutableStateOf("Starting…")
+        val error = mutableStateOf<String?>(null)
+        val done = mutableStateOf(false)
+        val cover = FrameLayout(this).apply {
+            isClickable = true      /* the guest is not to be driven meanwhile */
+            setBackgroundColor(Color.argb(235, 0, 0, 0))
+        }
+        cover.addView(ComposeView(this).apply {
+            setContent {
+                XemuTheme {
+                    DashboardInstallOverlay(
+                        progress = progress.floatValue,
+                        status = status.value,
+                        error = error.value,
+                        done = done.value,
+                        onClose = { exitToLibrary(saveResume = false) },
+                    )
+                }
+            }
+        }, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER,
+        ))
+        root.addView(cover, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+
+        Thread {
+            val err = com.boxxy.xboxlive.DashboardInstaller.install(
+                this, android.net.Uri.parse(zipUri), installPort,
+            ) { f, s -> runOnUiThread { progress.floatValue = f; status.value = s } }
+            runOnUiThread {
+                if (err == null) {
+                    done.value = true
+                    /* Give the guest a moment to finish writing before the
+                     * disk is flushed and the machine stops. */
+                    root.postDelayed({ exitToLibrary(saveResume = false) }, 3000)
+                } else {
+                    error.value = err
+                }
+            }
+        }.apply { name = "dashboard-install" }.start()
     }
 
     private fun getCachedOrCopy(uriStr: String, fileName: String): String {

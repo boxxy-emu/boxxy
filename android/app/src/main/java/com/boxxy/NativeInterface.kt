@@ -233,6 +233,20 @@ object NativeInterface {
     external fun setNetwork(enabled: Boolean, dns: String)
 
     /**
+     * Forward this device's 127.0.0.1:[hostPort] to the guest's TCP
+     * [guestPort] (0, 0: none).  Loopback only, so nothing else on the
+     * network can reach it.  Needs [setNetwork] on; set before [startEmulation].
+     */
+    external fun setNetForward(hostPort: Int, guestPort: Int)
+
+    /**
+     * Send every DNS query the guest makes to the resolver on this device's
+     * 127.0.0.1:[port] (0: off, queries go where the guest sends them).
+     * Takes effect at once.
+     */
+    external fun setDnsRedirect(port: Int)
+
+    /**
      * Number of voice-processing worker threads (0 = process synchronously on
      * the APU thread).  Read once when the APU starts, so this must be set
      * before [startEmulation]; changing it later has no effect.

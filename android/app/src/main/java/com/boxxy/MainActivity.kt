@@ -201,6 +201,9 @@ class MainActivity : ComponentActivity() {
                     composable("settings/network") {
                         NetworkSettingsScreen(navController, settingsViewModel)
                     }
+                    composable("settings/xboxlive") {
+                        XboxLiveSetupScreen(navController, settingsViewModel)
+                    }
                     composable("settings/audio") {
                         AudioSettingsScreen(navController)
                     }

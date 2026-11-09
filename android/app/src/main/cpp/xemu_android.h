@@ -119,6 +119,10 @@ void xemu_android_set_skip_boot_anim(bool enabled);
 
 /* NAT networking and the guest's upstream DNS server; before qemu_init(). */
 void xemu_android_set_network(bool enabled, const char *dns);
+/* Forward 127.0.0.1:host_port to the guest's TCP guest_port (0: none). */
+void xemu_android_set_net_forward(int host_port, int guest_port);
+/* Send the guest's DNS queries to 127.0.0.1:port, a resolver the app runs (0: off). */
+void xemu_android_set_dns_redirect(int port);
 
 /* Voice-processing worker threads; read once at startup, negative = default. */
 void xemu_android_set_voice_workers(int n);

@@ -113,6 +113,12 @@ void xemu_net_enable(void)
         assert(s != NULL);
 
         struct in_addr host_addr = { .s_addr = INADDR_ANY };
+#if defined(__ANDROID__) || defined(ANDROID)
+        extern bool g_android_net_fwd_loopback;
+        if (g_android_net_fwd_loopback) {
+            host_addr.s_addr = htonl(INADDR_LOOPBACK);
+        }
+#endif
         struct in_addr guest_addr = { .s_addr = 0 };
         inet_aton("10.0.2.15", &guest_addr);
 

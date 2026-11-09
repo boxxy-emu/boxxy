@@ -43,3 +43,57 @@ index f26c987..59368c2 100644
  
  #if defined(__HAIKU__)
  #define RESOLV_CONF_PATH "/boot/system/settings/network/resolv.conf"
+diff --git a/src/socket.c b/src/socket.c
+index fb9c019..bbf10df 100644
+--- a/src/socket.c
++++ b/src/socket.c
+@@ -951,8 +951,49 @@ void sofwdrain(struct socket *so)
+         sofcantsendmore(so);
+ }
+ 
++#if defined(__ANDROID__)
++/*
++ * Android: SLIRP_DNS_REDIRECT ("a.b.c.d:port") names a resolver the embedding
++ * app runs.  Every DNS query the guest sends over UDP goes there, whichever
++ * server the guest asked -- the virtual nameserver, or one typed into the
++ * guest's own settings -- so the app can answer some names itself.  Read on
++ * every query.
++ */
++static bool android_dns_redirect(struct sockaddr_in *sin)
++{
++    const char *env = getenv("SLIRP_DNS_REDIRECT");
++    char buf[INET_ADDRSTRLEN];
++    const char *colon;
++    long port;
++    size_t n;
++
++    if (!env || !(colon = strchr(env, ':'))) {
++        return false;
++    }
++    n = colon - env;
++    port = strtol(colon + 1, NULL, 10);
++    if (n >= sizeof(buf) || port <= 0 || port > 65535) {
++        return false;
++    }
++    memcpy(buf, env, n);
++    buf[n] = '\0';
++    if (inet_pton(AF_INET, buf, &sin->sin_addr) != 1) {
++        return false;
++    }
++    sin->sin_port = htons((uint16_t)port);
++    return true;
++}
++#endif
++
+ static bool sotranslate_out4(Slirp *s, struct socket *so, struct sockaddr_in *sin)
+ {
++#if defined(__ANDROID__)
++    if (so->so_type == IPPROTO_UDP && so->so_fport == htons(53) &&
++        android_dns_redirect(sin)) {
++        return true;
++    }
++#endif
++
+     if (!s->disable_dns && so->so_faddr.s_addr == s->vnameserver_addr.s_addr) {
+         return so->so_fport == htons(53) && get_dns_addr(&sin->sin_addr) >= 0;
+     }

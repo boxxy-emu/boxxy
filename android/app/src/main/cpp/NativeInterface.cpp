@@ -310,6 +310,17 @@ Java_com_boxxy_NativeInterface_setNetwork(JNIEnv *env, jclass clazz,
 }
 
 JNIEXPORT void JNICALL
+Java_com_boxxy_NativeInterface_setNetForward(JNIEnv *env, jclass clazz,
+                                            jint host_port, jint guest_port) {
+    xemu_android_set_net_forward((int)host_port, (int)guest_port);
+}
+
+JNIEXPORT void JNICALL
+Java_com_boxxy_NativeInterface_setDnsRedirect(JNIEnv *env, jclass clazz, jint port) {
+    xemu_android_set_dns_redirect((int)port);
+}
+
+JNIEXPORT void JNICALL
 Java_com_boxxy_NativeInterface_setVoiceWorkers(JNIEnv *env, jclass clazz,
                                               jint n) {
     xemu_android_set_voice_workers((int)n);

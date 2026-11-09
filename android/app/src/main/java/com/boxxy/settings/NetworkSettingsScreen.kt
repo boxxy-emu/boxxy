@@ -14,9 +14,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boxxy.emulation.GameLaunch
 
-/** Insignia's DNS server: it answers for the Xbox Live names and passes the rest on. */
-const val INSIGNIA_DNS = "46.101.64.175"
-
 @Composable
 fun NetworkSettingsScreen(
     navController: NavController,
@@ -35,6 +32,24 @@ fun NetworkSettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            SettingsSectionLabel("Xbox Live")
+            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        "Play online through Insignia, the revival of the original Xbox " +
+                        "Live. Setup walks you through it and does most of it for you.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = { navController.navigate("settings/xboxlive") }) {
+                        Text("Set up Xbox Live")
+                    }
+                }
+            }
+
             SettingsSectionLabel("Online")
             OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -64,9 +79,10 @@ fun NetworkSettingsScreen(
                         },
                     )
                     Text(
-                        "Used when the Xbox dashboard's DNS is set to automatic. " +
-                        "Insignia needs its own DNS ($INSIGNIA_DNS) to reach Xbox Live " +
-                        "services; it is chosen here so the dashboard can stay on automatic.",
+                        "With Insignia, Boxxy answers the Xbox's DNS itself, sending Xbox " +
+                        "Live's names to Insignia's servers and everything else through " +
+                        "this device. It works even on networks that block Insignia's DNS " +
+                        "server, and whatever DNS the Xbox's own settings name.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
