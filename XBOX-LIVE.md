@@ -170,7 +170,9 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
   `scanout_texture()` in `ui/xemu.c`; 15/16/32 bpp, ~10 Hz). Menu verified.
   Applies to any CPU-drawn homebrew. The HUD's FPS counts GPU frames only, so
   it reads 0 there.
-- Not yet tested: registration; account creation;
+- **Registered (2026-11-08):** with both fixes, the Setup Assistant's
+  "Register Xbox" reported "Your Xbox was successfully registered".
+- Not yet tested: account creation;
   Halo 2 sign-in and matchmaking.
 
 ## Open items
