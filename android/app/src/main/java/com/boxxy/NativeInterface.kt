@@ -260,6 +260,12 @@ object NativeInterface {
     external fun setEjectOnReset(enabled: Boolean)
 
     /**
+     * Xbox Live as seen on the network: "state\taccount", state one of off,
+     * connecting, online, offline, error:<code>.  Cheap; poll it.
+     */
+    external fun getXboxLiveStatus(): String
+
+    /**
      * Number of voice-processing worker threads (0 = process synchronously on
      * the APU thread).  Read once when the APU starts, so this must be set
      * before [startEmulation]; changing it later has no effect.

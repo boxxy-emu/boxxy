@@ -123,6 +123,8 @@ void xemu_android_set_network(bool enabled, const char *dns);
 void xemu_android_set_net_forward(int host_port, int guest_port);
 /* Send the guest's DNS queries to 127.0.0.1:port, a resolver the app runs (0: off). */
 void xemu_android_set_dns_redirect(int port);
+void xemu_xboxlive_install(void);
+void xemu_xboxlive_status(char *buf, size_t n);
 void xemu_android_set_eject_on_reset(bool enabled);
 
 /* Voice-processing worker threads; read once at startup, negative = default. */

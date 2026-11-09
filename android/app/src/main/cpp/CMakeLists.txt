@@ -101,6 +101,7 @@ add_library(xemu SHARED
     NativeInput.cpp
     xemu_android.c
     xemu_adpf.c
+    xemu_xboxlive.c
     ${CMAKE_CURRENT_SOURCE_DIR}/coroutine_android_asm.c
     ${XEMU_ROOT}/util/qemu-coroutine.c
     ${XEMU_ROOT}/util/qemu-coroutine-lock.c

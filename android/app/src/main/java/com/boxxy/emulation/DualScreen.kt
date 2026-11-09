@@ -148,6 +148,8 @@ class BottomPanelState {
     val overlayLabel = mutableStateOf("")
     val perfLabel = mutableStateOf("")
     val brightnessLabel = mutableStateOf("")
+    /** NativeInterface.getXboxLiveStatus(), "" while offline (no network). */
+    val xboxLive = mutableStateOf("")
     val widescreenLabel = mutableStateOf("")
     val recordingLabel = mutableStateOf("Record input")
     val recordingBusy = mutableStateOf(false)
@@ -337,6 +339,9 @@ private fun BottomPanel(state: BottomPanelState, actions: BottomPanelActions) {
             .alpha(if (dim) 0.5f else 1f)
             .padding(horizontal = 20.dp, vertical = 12.dp)) {
             ControllerBanner(state, actions)
+            if (state.xboxLive.value.isNotEmpty()) {
+                XboxLiveLine(state.xboxLive.value)
+            }
             TabRow(
                 selectedTabIndex = pager.currentPage,
                 containerColor = scheme.background,
@@ -436,6 +441,53 @@ private fun ControllerBanner(state: BottomPanelState, actions: BottomPanelAction
                 Text(if (here) "Back to game" else "Use controller here")
             }
         }
+    }
+}
+
+/**
+ * Xbox Live, in one line: who, and whether it is connected.  Online sessions
+ * only; the status is read off the network (xemu_xboxlive.c):
+ * "state\taccount\taccounts".
+ */
+@Composable
+private fun XboxLiveLine(status: String) {
+    val parts = status.split('\t')
+    val state = parts.getOrElse(0) { "" }
+    val who = parts.getOrElse(1) { "" }
+    val accounts = parts.getOrElse(2) { "0" }.toIntOrNull() ?: 0
+    val scheme = MaterialTheme.colorScheme
+    val (dot, label) = when {
+        state == "online" -> Color(0xFF6CC24A) to "Connected"
+        state == "connecting" -> Color(0xFFFFB300) to "Signing in\u2026"
+        state.startsWith("error") -> scheme.error to "Sign-in refused"
+        else -> scheme.onBackground.copy(alpha = 0.35f) to "Not connected"
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp),
+    ) {
+        Canvas(Modifier.size(10.dp)) { drawCircle(dot) }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "Xbox Live",
+            style = MaterialTheme.typography.labelMedium,
+            color = scheme.onBackground.copy(alpha = 0.65f),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            when {
+                who.isNotEmpty() -> who
+                accounts == 0 -> "No account"
+                else -> ""
+            },
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (state == "online") dot else scheme.onBackground.copy(alpha = 0.65f),
+        )
     }
 }
 

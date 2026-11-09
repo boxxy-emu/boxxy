@@ -136,6 +136,8 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
 
     // True after the first startEmulation() call — subsequent surface events use setSurface()
     private var emulationStarted = false
+    /** This session has networking (NAT); Xbox Live status is shown then. */
+    private var networkOnline = false
 
     // Per-game snapshot prefix derived from the ISO filename (e.g. "halo" → slots "halo_slot_1"…)
     private var gameId: String = "game"
@@ -461,6 +463,10 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
                     vcpuPct = t?.vcpuPct, nv2aPct = t?.nv2aPct,
                     gpuBusyPct = g?.busyPct, gpuMhz = g?.mhz,
                 )
+            }
+            /* Xbox Live status, for the lower screen (read off the NAT). */
+            if (networkOnline && emulationStarted) {
+                panelState.xboxLive.value = NativeInterface.getXboxLiveStatus()
             }
             lastFrameCount = count
             lastFpsTime = now
@@ -1745,6 +1751,7 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
          * also needs the guest's FTP server forwarded to this device. */
         val systemLaunch = intent.getBooleanExtra(EXTRA_SYSTEM_LAUNCH, false)
         val online = systemLaunch || mainPrefs.getBoolean("network_enabled", false)
+        networkOnline = online
         NativeInterface.setNetwork(online, networkDns())
         /* Insignia: Boxxy answers the Xbox's DNS itself (InsigniaDns), so
          * Xbox Live's names reach Insignia whatever the network does to DNS. */

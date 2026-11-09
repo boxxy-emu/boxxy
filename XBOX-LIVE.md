@@ -218,6 +218,28 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
 - Not yet tested:
   Halo 2 sign-in and matchmaking.
 
+## Xbox Live status on the lower screen
+
+`android/app/src/main/cpp/xemu_xboxlive.c`, shown by `XboxLiveLine` in
+`DualScreen.kt` for online sessions: a dot, the gamertag, and Connected /
+Signing in... / Not connected / Sign-in refused. The guest reports none of it:
+
+- **Accounts** come from the console's hard disk: a table at byte 0x1800
+  (sector 0xC), a 12-byte header (apparently checksum, version, count),
+  then 0x6C-byte XONLINE_USER records with the gamertag at +0x0C, domain
+  (`insignia.live`) at +0x24, realm (`PASSPORT.NET`) at +0x38. Only the
+  gamertag is read; the record also holds the passcode and key material.
+  Read with `blk_pread` on the main loop, once a minute.
+- **Connected** = Xbox Live answered in the last 90 s: replies on UDP 3074
+  (presence; Insignia's 51.68.122.14 on 2026-11-08) or from a Kerberos
+  server. Seen through a UDP tap added to libslirp
+  (`slirp_android_set_udp_tap`, in the slirp patch).
+- **Which account** signed in shows only when Kerberos (UDP 88, account
+  name in clear) crosses the network. The console caches tickets on the
+  disk, so an ordinary boot signs in with no Kerberos at all; then the
+  first account on the disk is shown. With several accounts that can be
+  the wrong one -- an open item.
+
 ## Open items
 
 - **Crash on the first boot of 5960** (once, right after installing; the next

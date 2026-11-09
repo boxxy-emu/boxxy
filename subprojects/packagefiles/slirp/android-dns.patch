@@ -1,3 +1,36 @@
+diff --git a/src/libslirp.h b/src/libslirp.h
+index 9acdcee..c021d2f 100644
+--- a/src/libslirp.h
++++ b/src/libslirp.h
+@@ -297,6 +297,16 @@ int slirp_state_load(Slirp *s, int version_id, SlirpReadCb read_cb,
+ SLIRP_EXPORT
+ const char *slirp_version_string(void);
+ 
++/*
++ * Embedder hook (Boxxy, Android): called with each UDP datagram the guest
++ * sends out (outbound = 1) and each reply from outside (0), with the remote
++ * IPv4 address (network order) and port.  Runs on the slirp thread.
++ */
++typedef void (*SlirpAndroidUdpTap)(int outbound, uint32_t addr_be,
++                                   uint16_t port, const uint8_t *data,
++                                   size_t len);
++SLIRP_EXPORT void slirp_android_set_udp_tap(SlirpAndroidUdpTap tap);
++
+ #ifdef __cplusplus
+ } /* extern "C" */
+ #endif
+diff --git a/src/libslirp.map b/src/libslirp.map
+index 3921f8a..4789f66 100644
+--- a/src/libslirp.map
++++ b/src/libslirp.map
+@@ -38,3 +38,7 @@ SLIRP_4.5 {
+ SLIRP_4.7 {
+     slirp_handle_timer;
+ } SLIRP_4.5;
++
++ANDROID_1 {
++    slirp_android_set_udp_tap;
++} SLIRP_4.7;
 diff --git a/src/slirp.c b/src/slirp.c
 index f26c987..59368c2 100644
 --- a/src/slirp.c
@@ -44,10 +77,55 @@ index f26c987..59368c2 100644
  #if defined(__HAIKU__)
  #define RESOLV_CONF_PATH "/boot/system/settings/network/resolv.conf"
 diff --git a/src/socket.c b/src/socket.c
-index fb9c019..ac13af6 100644
+index fb9c019..b3ea3eb 100644
 --- a/src/socket.c
 +++ b/src/socket.c
-@@ -951,8 +951,49 @@ void sofwdrain(struct socket *so)
+@@ -498,6 +498,28 @@ err_disconnected:
+ /*
+  * recvfrom() a UDP socket
+  */
++/*
++ * Embedder hook: sees each UDP datagram the guest sends out and each reply
++ * from outside, with the remote (IPv4) address and port.  Boxxy reads Xbox
++ * Live's Kerberos sign-in from it, for its status display.  Called on the
++ * slirp thread; must be quick.
++ */
++static SlirpAndroidUdpTap slirp_android_udp_tap;
++
++SLIRP_EXPORT void slirp_android_set_udp_tap(SlirpAndroidUdpTap tap)
++{
++    slirp_android_udp_tap = tap;
++}
++
++static void android_udp_tap(int outbound, struct socket *so,
++                            const uint8_t *data, ssize_t len)
++{
++    SlirpAndroidUdpTap tap = slirp_android_udp_tap;
++    if (tap && len > 0 && so->so_ffamily == AF_INET) {
++        tap(outbound, so->so_faddr.s_addr, ntohs(so->so_fport), data, len);
++    }
++}
++
+ void sorecvfrom(struct socket *so)
+ {
+     struct sockaddr_storage addr;
+@@ -675,6 +697,7 @@ void sorecvfrom(struct socket *so)
+                 m_free(m);
+             }
+         } else {
++            android_udp_tap(0, so, (const uint8_t *)m->m_data, m->m_len);
+             /*
+              * Hack: domain name lookup will be used the most for UDP,
+              * and since they'll only be used once there's no need
+@@ -757,6 +780,7 @@ int sosendto(struct socket *so, struct mbuf *m)
+                  sockaddr_size(&addr));
+     if (ret < 0)
+         return -1;
++    android_udp_tap(1, so, (const uint8_t *)m->m_data, m->m_len);
+ 
+     /*
+      * Kill the socket if there's no reply in 4 minutes,
+@@ -951,8 +975,49 @@ void sofwdrain(struct socket *so)
          sofcantsendmore(so);
  }
  
@@ -97,7 +175,7 @@ index fb9c019..ac13af6 100644
      if (!s->disable_dns && so->so_faddr.s_addr == s->vnameserver_addr.s_addr) {
          return so->so_fport == htons(53) && get_dns_addr(&sin->sin_addr) >= 0;
      }
-@@ -1025,6 +1066,21 @@ void sotranslate_in(struct socket *so, struct sockaddr_storage *addr)
+@@ -1025,6 +1090,21 @@ void sotranslate_in(struct socket *so, struct sockaddr_storage *addr)
  
      switch (addr->ss_family) {
      case AF_INET:

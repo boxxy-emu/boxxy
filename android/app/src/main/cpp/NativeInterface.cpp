@@ -336,6 +336,13 @@ Java_com_boxxy_NativeInterface_setEjectOnReset(JNIEnv *env, jclass clazz, jboole
     xemu_android_set_eject_on_reset(enabled);
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_boxxy_NativeInterface_getXboxLiveStatus(JNIEnv *env, jclass clazz) {
+    char buf[128];
+    xemu_xboxlive_status(buf, sizeof(buf));
+    return env->NewStringUTF(buf);
+}
+
 JNIEXPORT void JNICALL
 Java_com_boxxy_NativeInterface_setVoiceWorkers(JNIEnv *env, jclass clazz,
                                               jint n) {

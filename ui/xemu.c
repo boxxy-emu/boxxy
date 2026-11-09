@@ -4656,6 +4656,10 @@ int xemu_core_main(int argc, char **argv)
               dns ? dns : "none");
         g_config.net.enable = g_android_net;
         g_config.net.backend = CONFIG_NET_BACKEND_NAT;
+        if (g_android_net) {
+            extern void xemu_xboxlive_install(void);
+            xemu_xboxlive_install();     /* Xbox Live status, read off the NAT */
+        }
 
         /* Diagnostic: debug.xemu.net_fwd=HOST:GUEST forwards one TCP port
          * of this device to the guest (e.g. 2121:21 for an FTP server),
