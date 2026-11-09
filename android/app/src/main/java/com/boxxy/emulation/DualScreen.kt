@@ -585,7 +585,7 @@ private fun MenuGrid(state: BottomPanelState, actions: BottomPanelActions) {
         "Touch controls\n${state.overlayLabel.value}",
         "Performance\n${state.perfLabel.value}",
         "Brightness\n${state.brightnessLabel.value}",
-        "Widescreen\n${state.widescreenLabel.value}",
+        "Aspect ratio\n${state.widescreenLabel.value}",
         "Map controls",
         state.recordingLabel.value,
         "Play recording",

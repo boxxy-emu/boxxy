@@ -172,7 +172,7 @@ fun InGameMenu(
                     dismissesMenu = false,
                 ) { brightnessLabel = onCycleBrightness() }
                 MenuRow(
-                    label = "Widescreen",
+                    label = "Aspect ratio",
                     value = widescreenLabel,
                     dismissesMenu = false,
                 ) { widescreenLabel = onToggleWidescreen() }

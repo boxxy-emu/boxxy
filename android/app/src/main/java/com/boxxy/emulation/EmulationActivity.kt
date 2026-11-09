@@ -2472,16 +2472,29 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
         return "$next%"
     }
 
-    private fun widescreenLabel(on: Boolean) = if (on) "On" else "Off"
+    private fun widescreenLabel(on: Boolean) = if (on) "16:9" else "4:3"
 
-    /** The in-game menu's Widescreen: the running Xbox's setting, kept as
-     *  Boxxy's too.  Auto aspect follows at once; games when they restart. */
+    /** The in-game menu's Aspect ratio (4:3 / 16:9): the running Xbox's
+     *  widescreen setting, kept as Boxxy's too.  The picture follows at once;
+     *  games when they restart. */
     private fun toggleWidescreen(): String {
         val next = !NativeInterface.isWidescreen()
         NativeInterface.setWidescreenLive(next)
         saveWidescreenSetting(next)
+        /* The picture follows the setting only with Auto aspect; a fixed
+         * aspect would leave this menu's 4:3 / 16:9 untrue. */
+        if (gameInt("aspect_ratio", 1) != 1) {
+            NativeInterface.setAspectRatio(1)
+            if (gameId == "dashboard") {
+                GameSettings.setOverride(this, gameSettingsKey, "aspect_ratio", null)
+                mainPrefs.edit().putInt("aspect_ratio", 1).apply()
+            } else {
+                GameSettings.setOverride(this, gameSettingsKey, "aspect_ratio",
+                    if (mainPrefs.getInt("aspect_ratio", 1) == 1) null else "1")
+            }
+        }
         if (gameId != "dashboard") {
-            showMessage("Widescreen ${if (next) "on" else "off"}: games apply it when they restart")
+            showMessage("${widescreenLabel(next)}: games switch to it when they restart")
         }
         return widescreenLabel(next)
     }

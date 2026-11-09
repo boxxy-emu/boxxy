@@ -449,6 +449,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshFromEmulator() {
         refreshPerfOverlay()
         _xboxWidescreen.value = prefs.getBoolean("xbox_widescreen", false)
+        _aspectRatio.value = prefs.getInt("aspect_ratio", 1)
     }
 
     fun setOverlayPosition(value: String) {
