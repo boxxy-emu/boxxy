@@ -134,6 +134,12 @@ object NativeInterface {
     external fun setX87Rounding(enabled: Boolean)
     /** The Xbox's widescreen setting (EEPROM VideoFlags). Before startEmulation(). */
     external fun setWidescreen(enabled: Boolean)
+    /** Change the Xbox's widescreen setting while it runs, as its dashboard
+     *  would.  Auto aspect follows at once; games read it when they start. */
+    external fun setWidescreenLive(enabled: Boolean)
+    /** The running Xbox's widescreen setting (it may have changed it itself,
+     *  in the dashboard); Boxxy's setting before the machine exists. */
+    external fun isWidescreen(): Boolean
 
     /** True once the emulated controller's USB devices exist -- a save state
      *  cannot be loaded before then. */

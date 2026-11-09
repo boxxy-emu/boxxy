@@ -78,6 +78,7 @@ fun InGameMenu(
     initialOverlayLabel: String,
     initialPerfLabel: String,
     initialBrightnessLabel: String,
+    initialWidescreenLabel: String,
     exitLabel: String,
     recordingLabel: String,
     isRecordingBusy: Boolean,
@@ -87,6 +88,7 @@ fun InGameMenu(
     onCycleOverlay: () -> String,
     onTogglePerf: () -> String,
     onCycleBrightness: () -> String,
+    onToggleWidescreen: () -> String,
     onSaveState: () -> Unit,
     onLoadState: () -> Unit,
     onMapControls: () -> Unit,
@@ -151,6 +153,7 @@ fun InGameMenu(
                 var overlayLabel by remember { mutableStateOf(initialOverlayLabel) }
                 var perfLabel by remember { mutableStateOf(initialPerfLabel) }
                 var brightnessLabel by remember { mutableStateOf(initialBrightnessLabel) }
+                var widescreenLabel by remember { mutableStateOf(initialWidescreenLabel) }
 
                 MenuSectionLabel("Display")
                 MenuRow(
@@ -168,6 +171,11 @@ fun InGameMenu(
                     value = brightnessLabel,
                     dismissesMenu = false,
                 ) { brightnessLabel = onCycleBrightness() }
+                MenuRow(
+                    label = "Widescreen",
+                    value = widescreenLabel,
+                    dismissesMenu = false,
+                ) { widescreenLabel = onToggleWidescreen() }
 
                 MenuSeparator()
                 MenuSectionLabel("Save States")

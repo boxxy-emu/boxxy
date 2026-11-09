@@ -883,6 +883,7 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
         unregisterReceiver(playbackReceiver)
         vibrator.cancel()
         NativeInterface.pauseEmulation()  // idempotent: safe even if already user-paused
+        syncWidescreenSetting()
         if (emulationStarted) Thread { NativeInterface.pruneStates() }.start()
         inputManager.unregisterInputDeviceListener(this)
         displayManager.unregisterDisplayListener(displayListener)
@@ -952,6 +953,7 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
         if (isExiting) return
         isExiting = true
         showMessage("Saving\u2026")
+        syncWidescreenSetting()
         Thread {
             if (shouldAutoSave()) {
                 saveResumePoint()
@@ -1362,6 +1364,8 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
                 onFullyHidden = onHidden,
                 initialBrightnessLabel = "${gameInt("brightness", 100)}%",
                 onCycleBrightness = { cycleBrightness() },
+                initialWidescreenLabel = widescreenLabel(NativeInterface.isWidescreen()),
+                onToggleWidescreen = { toggleWidescreen() },
                 onCycleOverlay = { cycleOverlayMode() },
                 onTogglePerf = { togglePerfOverlay() },
                 onSaveState = { dismissOverlay(); showSlotPicker(isSave = true) },
@@ -2463,6 +2467,48 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
                                  if (next == global) null else next.toString())
         NativeInterface.setBrightness(next)
         return "$next%"
+    }
+
+    private fun widescreenLabel(on: Boolean) = if (on) "On" else "Off"
+
+    /** The in-game menu's Widescreen: the running Xbox's setting, kept as
+     *  Boxxy's too.  Auto aspect follows at once; games when they restart. */
+    private fun toggleWidescreen(): String {
+        val next = !NativeInterface.isWidescreen()
+        NativeInterface.setWidescreenLive(next)
+        saveWidescreenSetting(next)
+        if (gameId != "dashboard") {
+            showMessage("Widescreen ${if (next) "on" else "off"}: games apply it when they restart")
+        }
+        return widescreenLabel(next)
+    }
+
+    /**
+     * Keep Boxxy's widescreen setting equal to the Xbox's, which writes it to
+     * the EEPROM at every launch.  From the dashboard (no disc) it is the
+     * global setting, as the dashboard's own is console-wide; in a game it is
+     * that game's, like the menu's brightness (no override when it matches).
+     */
+    private fun saveWidescreenSetting(on: Boolean) {
+        if (gameId == "dashboard") {
+            GameSettings.setOverride(this, gameSettingsKey, "xbox_widescreen", null)
+            mainPrefs.edit().putBoolean("xbox_widescreen", on).apply()
+        } else {
+            val global = mainPrefs.getBoolean("xbox_widescreen", false)
+            GameSettings.setOverride(this, gameSettingsKey, "xbox_widescreen",
+                                     if (on == global) null else on.toString())
+        }
+    }
+
+    /** The dashboard may have changed the Xbox's widescreen setting itself;
+     *  keep it, or the next launch writes Boxxy's old one back. */
+    private fun syncWidescreenSetting() {
+        if (!emulationStarted) return
+        val live = NativeInterface.isWidescreen()
+        if (live != gameBool("xbox_widescreen", false)) {
+            Log.i("xemu-android", "widescreen changed by the Xbox: now ${if (live) "on" else "off"}")
+            saveWidescreenSetting(live)
+        }
     }
 
     /** Read graphics settings from main_prefs and push to native layer. */

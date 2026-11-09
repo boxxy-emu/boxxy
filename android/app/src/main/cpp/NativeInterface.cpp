@@ -203,6 +203,17 @@ Java_com_boxxy_NativeInterface_setWidescreen(JNIEnv *env, jclass clazz,
 }
 
 JNIEXPORT void JNICALL
+Java_com_boxxy_NativeInterface_setWidescreenLive(JNIEnv *env, jclass clazz,
+                                                 jboolean enabled) {
+    xemu_android_set_widescreen_live((bool)enabled);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_boxxy_NativeInterface_isWidescreen(JNIEnv *env, jclass clazz) {
+    return xemu_android_widescreen_enabled();
+}
+
+JNIEXPORT void JNICALL
 Java_com_boxxy_NativeInterface_setX87Rounding(JNIEnv *env, jclass clazz,
                                               jboolean enabled) {
     xemu_android_set_x87_rounding((bool)enabled);

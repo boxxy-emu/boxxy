@@ -53,10 +53,50 @@ typedef struct SMBusStorageDevice {
     bool persist;
 } SMBusStorageDevice;
 
+/* The Xbox's EEPROM (address 0x54), for the host to read and change its
+ * settings while the machine runs: see xbox_eeprom_data(). */
+static SMBusStorageDevice *g_xbox_eeprom;
+
+static int smbus_storage_persist(SMBusStorageDevice *s)
+{
+    if (!s->file || !s->persist) {
+        return 0;
+    }
+    int fd = qemu_open(s->file, O_WRONLY | O_BINARY, NULL);
+    if (fd < 0) {
+        DPRINTF("%s: file '%s' could not be opened\n", __func__, s->file);
+        return -1;
+    }
+    int wc = write(fd, s->data, s->size);
+    close(fd);
+    if (wc != s->size) {
+        DPRINTF("%s: file '%s' write failure\n", __func__, s->file);
+        return -1;
+    }
+    return 0;
+}
+
+/* The running Xbox's EEPROM contents, or NULL before the machine exists.
+ * Change it only with the BQL held, then call xbox_eeprom_persist(). */
+uint8_t *xbox_eeprom_data(void)
+{
+    return g_xbox_eeprom ? g_xbox_eeprom->data : NULL;
+}
+
+void xbox_eeprom_persist(void)
+{
+    if (g_xbox_eeprom) {
+        smbus_storage_persist(g_xbox_eeprom);
+    }
+}
+
 static void smbus_storage_realize(DeviceState *dev, Error **errp)
 {
     SMBusStorageDevice *s = SMBUS_STORAGE(dev);
     qdev_prop_set_uint8(dev, "address", s->addr);
+    if (s->addr == 0x54) {
+        g_xbox_eeprom = s;
+    }
     s->data = g_malloc0(s->size);
     s->offset = 0;
 
@@ -108,20 +148,8 @@ static int smbus_storage_write_data(SMBusDevice *dev, uint8_t *buf, uint8_t len)
         s->offset = (s->offset + 1) % s->size;
     }
 
-    if (changed && s->file && s->persist) {
-        int fd = qemu_open(s->file, O_WRONLY | O_BINARY, NULL);
-        if (fd < 0) {
-            DPRINTF("%s: file '%s' could not be opened\n", __func__, s->file);
-            return -1;
-        }
-
-        int wc = write(fd, s->data, s->size);
-        if (wc != s->size) {
-            DPRINTF( "%s: file '%s' write failure\n", __func__, s->file);
-            close(fd);
-            return -1;
-        }
-        close(fd);
+    if (changed && smbus_storage_persist(s) < 0) {
+        return -1;
     }
 
     return 0;

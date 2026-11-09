@@ -440,6 +440,17 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         _perfOverlay.value = fresh.getBoolean(PREF_PERF_OVERLAY, true)
     }
 
+    /**
+     * Settings the emulator's process changes (the in-game menu, or the
+     * dashboard's widescreen setting kept at exit).  Re-reading main_prefs
+     * also refreshes this process's cache, so a later edit here cannot write
+     * the stale values back.
+     */
+    fun refreshFromEmulator() {
+        refreshPerfOverlay()
+        _xboxWidescreen.value = prefs.getBoolean("xbox_widescreen", false)
+    }
+
     fun setOverlayPosition(value: String) {
         _overlayPosition.value = value
         prefs.edit().putString("overlay_position", value).apply()

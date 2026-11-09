@@ -1,6 +1,7 @@
 #include "qemu/osdep.h"
 #include "exec/tb-flush.h"
 #include "hw/core/cpu.h"
+#include "qemu/main-loop.h"
 #include "xemu_android.h"
 #include <sys/system_properties.h>
 #ifdef HAVE_ADRENOTOOLS
@@ -787,10 +788,6 @@ void xemu_android_set_widescreen(bool enabled) {
     s_widescreen_pref = enabled;
 }
 
-/* Auto aspect follows this, as a real TV's 16:9 setting would. */
-bool xemu_android_widescreen_enabled(void) {
-    return s_widescreen_pref == 1;
-}
 
 #define EEPROM_USER_CHECKSUM  0x60
 #define EEPROM_USER_SECTION   0x64
@@ -814,12 +811,71 @@ static uint32_t eeprom_user_crc(const uint8_t *p)
     return ~(high + low);
 }
 
+uint8_t *xbox_eeprom_data(void);
+void xbox_eeprom_persist(void);
+
+/*
+ * Auto aspect follows the Xbox's widescreen setting, as a real TV set to
+ * 16:9 would: the running EEPROM's, so a change made in the dashboard shows
+ * at once; Boxxy's setting until the machine exists.
+ */
+bool xemu_android_widescreen_enabled(void) {
+    const uint8_t *e = xbox_eeprom_data();
+    if (e) {
+        uint32_t flags;
+        memcpy(&flags, e + EEPROM_VIDEO_FLAGS, 4);
+        return flags & VIDEO_WIDESCREEN;
+    }
+    return s_widescreen_pref == 1;
+}
+
+/* Widescreen and letterbox are alternatives; widescreen wins. */
+static uint32_t video_flags_for(uint32_t flags, bool widescreen) {
+    return widescreen ? ((flags | VIDEO_WIDESCREEN) & ~VIDEO_LETTERBOX)
+                      : (flags & ~VIDEO_WIDESCREEN);
+}
+
+/* Set VideoFlags in a 256-byte EEPROM image and fix its checksum; whether
+ * anything changed. */
+static bool eeprom_set_widescreen(uint8_t *e, bool widescreen, uint32_t *was) {
+    uint32_t flags, want, crc;
+    memcpy(&flags, e + EEPROM_VIDEO_FLAGS, 4);
+    *was = flags;
+    want = video_flags_for(flags, widescreen);
+    if (want == flags) {
+        return false;
+    }
+    memcpy(e + EEPROM_VIDEO_FLAGS, &want, 4);
+    crc = eeprom_user_crc(e + EEPROM_USER_SECTION);
+    memcpy(e + EEPROM_USER_CHECKSUM, &crc, 4);
+    return true;
+}
+
+/*
+ * Change the Xbox's widescreen setting while it runs, as its dashboard would.
+ * Auto aspect follows at once; games read the setting when they start.
+ */
+void xemu_android_set_widescreen_live(bool enabled) {
+    uint8_t *e;
+    uint32_t was;
+
+    s_widescreen_pref = enabled;
+    bql_lock();
+    e = xbox_eeprom_data();
+    if (e && eeprom_set_widescreen(e, enabled, &was)) {
+        xbox_eeprom_persist();
+        LOGI("eeprom: widescreen %s while running (VideoFlags 0x%08x)",
+             enabled ? "on" : "off", was);
+    }
+    bql_unlock();
+}
+
 /* Called from qemu_init (system/vl.c) after the EEPROM exists and before
  * the machine reads it. */
 void xemu_android_prepare_eeprom(const char *path) {
     uint8_t e[256];
     FILE *f;
-    uint32_t flags, want;
+    uint32_t flags;
 
     if (s_widescreen_pref < 0 || !path || !(f = fopen(path, "r+b"))) {
         return;
@@ -828,21 +884,13 @@ void xemu_android_prepare_eeprom(const char *path) {
         fclose(f);
         return;
     }
-    memcpy(&flags, e + EEPROM_VIDEO_FLAGS, 4);
-    /* Widescreen and letterbox are alternatives; widescreen wins. */
-    want = s_widescreen_pref ? ((flags | VIDEO_WIDESCREEN) & ~VIDEO_LETTERBOX)
-                             : (flags & ~VIDEO_WIDESCREEN);
-    if (want != flags) {
-        uint32_t crc;
-        memcpy(e + EEPROM_VIDEO_FLAGS, &want, 4);
-        crc = eeprom_user_crc(e + EEPROM_USER_SECTION);
-        memcpy(e + EEPROM_USER_CHECKSUM, &crc, 4);
+    if (eeprom_set_widescreen(e, s_widescreen_pref, &flags)) {
         fseek(f, 0, SEEK_SET);
         fwrite(e, 1, sizeof(e), f);
     }
     fclose(f);
-    LOGI("eeprom: widescreen %s (VideoFlags 0x%08x -> 0x%08x)",
-         s_widescreen_pref ? "on" : "off", flags, want);
+    LOGI("eeprom: widescreen %s (VideoFlags were 0x%08x)",
+         s_widescreen_pref ? "on" : "off", flags);
 }
 
 /* C4: honour the guest's x87 rounding mode.  Must be set before emulation

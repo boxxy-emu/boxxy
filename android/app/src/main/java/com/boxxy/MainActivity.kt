@@ -144,6 +144,11 @@ class MainActivity : ComponentActivity() {
         maybeRelaunchGame(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        settingsViewModel.refreshFromEmulator()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         maybeRelaunchGame(intent)
