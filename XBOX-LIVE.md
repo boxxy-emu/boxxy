@@ -177,13 +177,30 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
   `NativeInterface.setEjectOnReset`: the first guest reset removes the media
   (`qmp_eject`, no eject-button event, which would reset again), so Quit
   boots the dashboard. Verified.
-- **pfifo aborts in the 5960 dashboard**, twice, after ~15 s and ~70 s idle:
-  "Dma value is out of range" and "Reserved pb command" (upstream asserts
-  the same). Cause unknown. The pusher now logs the words around dma_get
-  and the pointers (`pfifo_log_bad_pushbuffer`, tag `xemu-stdout`), and
-  re-reads a bad word after 1 ms: if it changed, it was read before the
-  guest's write landed (a visibility race) and is processed instead of
-  aborting. Waiting for the next occurrence.
+- **pfifo aborts in the 5960 dashboard** (open). Seven so far, 15 s to
+  3 min into an idle dashboard, both "Dma value is out of range" and
+  "Reserved pb command" (upstream asserts the same). Established
+  2026-11-08 with a pusher trace (last 64 commands, `pfifo_log_bad_pushbuffer`):
+  - The pusher does not miscount: every method consumed what its header
+    said. It reads a bad word right after `NO_OPERATION` with a parameter
+    (the notify interrupt), always the sequence `17fc`, `a310` (subch 5),
+    `1d70`, `1d90`, `0100`, and in 2 of 3 traces that word is where the
+    previous lap's wrap JMP was (jmp shadow - 4).
+  - The bad words look like 16-bit stereo audio (`35da35d1`, `64ac64ac`,
+    `357f3580`, `0d020d01`) or `ff000000` runs.
+  - Not pfifo batching (`debug.xemu.pfifo_batch=0` still aborts in 20 s).
+  - Not the guest moving DMA_GET during a command (checked; the pusher now
+    lets such a write win anyway).
+  - Not a Vulkan surface write-back near the pushbuffer (logged, none).
+  - Not the NOP-interrupt ack ordering: it is written under pfifo.lock and
+    pg->lock.
+  - With DSP RAM-write tracing added (`apu_write_trace` in `gp_ep.c`, an
+    atomic per DSP DMA write; reported near the bad address at an abort) the
+    dashboard ran 12 min without an abort, against 25-95 s for the four
+    builds before it. Unexplained; may be timing. Next abort's log says
+    whether the DSP wrote there.
+  The diagnostics (pusher trace per method, surface and DSP write checks)
+  cost a little on hot paths; take them out once this is understood.
 - Not yet tested: account creation;
   Halo 2 sign-in and matchmaking.
 
