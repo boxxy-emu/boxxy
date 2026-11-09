@@ -213,7 +213,9 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
     likely chance.
   The diagnostics (pusher trace per method, surface and DSP write checks)
   cost a little on hot paths; take them out once this is understood.
-- Not yet tested: account creation;
+- **Account created and signed in (2026-11-08):** the 5960 dashboard signs
+  in to Xbox Live on boot with the new gamertag.
+- Not yet tested:
   Halo 2 sign-in and matchmaking.
 
 ## Open items

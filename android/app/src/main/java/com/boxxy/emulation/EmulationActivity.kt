@@ -2283,6 +2283,8 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
                     panelState.perfLabel.value = togglePerfOverlay()
                 BottomPanelState.MENU_BRIGHTNESS ->
                     panelState.brightnessLabel.value = cycleBrightness()
+                BottomPanelState.MENU_WIDESCREEN ->
+                    panelState.widescreenLabel.value = toggleWidescreen()
                 BottomPanelState.MENU_MAP_CONTROLS -> startActivity(
                     Intent(this@EmulationActivity, MappingActivity::class.java))
                 BottomPanelState.MENU_RECORD -> {
@@ -2310,6 +2312,7 @@ class EmulationActivity : AppCompatActivity(), InputManager.InputDeviceListener 
         panelState.overlayLabel.value = overlayModeLabel()
         panelState.perfLabel.value = perfOverlayLabel()
         panelState.brightnessLabel.value = "${gameInt("brightness", 100)}%"
+        panelState.widescreenLabel.value = widescreenLabel(NativeInterface.isWidescreen())
         panelState.recordingLabel.value = when {
             InputRecorder.isRecording -> "Stop recording"
             InputRecorder.isPlaying   -> "Playback active"

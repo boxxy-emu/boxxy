@@ -146,7 +146,10 @@ fun GraphicsSettingsScreen(
                                    "screen with Auto. Games that do not would " +
                                    "look stretched -- leave it off for those " +
                                    "(long-press a game \u2192 Game settings). " +
-                                   "Applies the next time a game starts.",
+                                   "Also in the in-game menu, where the picture " +
+                                   "changes at once and games pick it up when " +
+                                   "they restart. Changing it in the Xbox " +
+                                   "dashboard changes it here too.",
                         checked = xboxWidescreen,
                     ) { settingsViewModel.setXboxWidescreen(it) }
                 }
