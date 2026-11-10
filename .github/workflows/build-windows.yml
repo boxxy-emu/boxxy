@@ -33,9 +33,12 @@ jobs:
       with:
         name: src
     - name: Install curl
+      # dsp56300's meson.build downloads its library with curl.  Ubuntu's
+      # mirrors are sometimes mid-sync; a stale index still installs curl.
       run: |
-        apt-get update
-        apt-get install -qy curl
+        command -v curl && exit 0
+        apt-get update -o Acquire::Retries=5 || true
+        apt-get install -qy -o Acquire::Retries=5 curl
     - name: Install zstd
       if: ${{ matrix.arch == 'arm64' }}
       run: apt-get install zstd
