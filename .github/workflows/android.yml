@@ -25,6 +25,8 @@ jobs:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/../vcpkg-cache
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # history and tags: the version comes from git
 
       - name: Check out libadrenotools
         run: git submodule update --init --recursive android/app/libs/libadrenotools

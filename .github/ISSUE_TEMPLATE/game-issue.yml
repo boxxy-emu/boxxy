@@ -46,7 +46,7 @@ body:
     id: device
     attributes:
       label: Device and Boxxy version
-      description: The Boxxy version and your Android version are under Settings → Advanced.
+      description: The Boxxy version, your device and Android version are under Settings → About.
       placeholder: |
         Boxxy version: 1.0
         Device: AYN Thor (Snapdragon 8 Gen 2)

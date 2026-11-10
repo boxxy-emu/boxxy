@@ -218,6 +218,9 @@ class MainActivity : ComponentActivity() {
                     composable("settings/advanced") {
                         AdvancedSettingsScreen(navController, settingsViewModel)
                     }
+                    composable("settings/about") {
+                        com.boxxy.settings.AboutScreen(navController)
+                    }
                     composable("game_settings/{key}?name={name}") { entry ->
                         GameSettingsScreen(
                             navController,

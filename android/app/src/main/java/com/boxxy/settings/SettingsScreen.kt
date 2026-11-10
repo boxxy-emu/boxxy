@@ -90,8 +90,16 @@ fun SettingsScreen(navController: NavController) {
                 SettingsGroupRow(
                     icon = Icons.Outlined.Tune,
                     title = "Advanced",
-                    subtitle = "Shader cache, build info",
+                    subtitle = "Shader cache, diagnostics",
                     onClick = { navController.navigate("settings/advanced") },
+                )
+            }
+            item {
+                SettingsGroupRow(
+                    icon = Icons.Outlined.Info,
+                    title = "About",
+                    subtitle = "Version ${com.boxxy.BuildConfig.VERSION_NAME}",
+                    onClick = { navController.navigate("settings/about") },
                 )
             }
         }

@@ -162,32 +162,8 @@ fun AdvancedSettingsScreen(
                 }
             }
 
-            SettingsSectionLabel("Build Info")
-            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp),
-                       verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    BuildInfoRow("Package", context.packageName)
-                    BuildInfoRow("Version", try {
-                        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "—"
-                    } catch (_: Exception) { "—" })
-                    BuildInfoRow("ABI", android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "—")
-                    BuildInfoRow("Android", android.os.Build.VERSION.RELEASE)
-                }
-            }
-
             Spacer(Modifier.height(8.dp))
         }
     }
 }
 
-@Composable
-private fun BuildInfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodySmall)
-    }
-}

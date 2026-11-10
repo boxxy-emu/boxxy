@@ -8,6 +8,27 @@ plugins {
 val vcpkgRoot: String = System.getenv("VCPKG_ROOT")
     ?: "${System.getProperty("user.home")}/projects/vcpkg"
 
+/*
+ * Version from git.  Releases are tagged boxxy-v<version> (the repository
+ * also carries xemu's own v0.x tags, which must not be picked up): at the tag
+ * the version is "1.0", later commits read "1.0-12-gabc1234", and "-dirty"
+ * marks uncommitted changes.  The version code is the commit count, so every
+ * build of a later commit installs over an earlier one.  CI checks out the
+ * full history for this (.github/workflows/android.yml).
+ */
+fun git(vararg args: String): String? = try {
+    val proc = ProcessBuilder("git", *args).directory(rootDir).redirectErrorStream(false).start()
+    val out = proc.inputStream.bufferedReader().readText().trim()
+    if (proc.waitFor() == 0 && out.isNotEmpty()) out else null
+} catch (e: Exception) {
+    null
+}
+val gitCommit = git("rev-parse", "--short=10", "HEAD") ?: "unknown"
+val gitDescribe = git("describe", "--tags", "--match", "boxxy-v*", "--dirty")
+val boxxyVersionName = gitDescribe?.removePrefix("boxxy-v") ?: "0.0-dev-g$gitCommit"
+val boxxyVersionCode = git("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
+val boxxyCommitDate = git("log", "-1", "--format=%cs") ?: "unknown"
+
 android {
     namespace = "com.boxxy"
     compileSdk = 34
@@ -17,8 +38,10 @@ android {
         applicationId = "com.boxxy"
         minSdk = 33
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = boxxyVersionCode
+        versionName = boxxyVersionName
+        buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
+        buildConfigField("String", "COMMIT_DATE", "\"$boxxyCommitDate\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -64,6 +87,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         // Required by libadrenotools: hook .so files must be extracted to
