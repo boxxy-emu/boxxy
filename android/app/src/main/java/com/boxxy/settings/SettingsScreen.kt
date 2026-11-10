@@ -96,6 +96,14 @@ fun SettingsScreen(navController: NavController) {
             }
             item {
                 SettingsGroupRow(
+                    icon = Icons.Outlined.SettingsBackupRestore,
+                    title = "Backup",
+                    subtitle = "Save or restore your saves, settings and Xbox hard disk",
+                    onClick = { navController.navigate("settings/backup") },
+                )
+            }
+            item {
+                SettingsGroupRow(
                     icon = Icons.Outlined.Info,
                     title = "About",
                     subtitle = "Version ${com.boxxy.BuildConfig.VERSION_NAME}",

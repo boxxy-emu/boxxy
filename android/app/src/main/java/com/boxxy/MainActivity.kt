@@ -218,6 +218,9 @@ class MainActivity : ComponentActivity() {
                     composable("settings/advanced") {
                         AdvancedSettingsScreen(navController, settingsViewModel)
                     }
+                    composable("settings/backup") {
+                        com.boxxy.settings.BackupScreen(navController)
+                    }
                     composable("settings/about") {
                         com.boxxy.settings.AboutScreen(navController)
                     }
@@ -245,11 +248,20 @@ class MainActivity : ComponentActivity() {
         fun getRealFilePath(context: Context, uriString: String, fileName: String): String {
             val uri = Uri.parse(uriString)
             val file = java.io.File(context.filesDir, fileName)
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                file.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            } ?: throw Exception("Failed to open input stream for $uriString")
+            /* Refresh the private copy from the user's file -- or keep the copy
+             * when that file can't be read any more: moved, deleted, or its
+             * permission revoked by a reinstall (restored from a backup). */
+            val tmp = java.io.File(context.filesDir, "$fileName.copying")
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    tmp.outputStream().use { output -> input.copyTo(output) }
+                } ?: throw Exception("Failed to open input stream for $uriString")
+                if (!tmp.renameTo(file)) throw Exception("Could not store $fileName")
+            } catch (e: Exception) {
+                tmp.delete()
+                if (!file.isFile || file.length() == 0L) throw e
+                android.util.Log.w("xemu-android", "$fileName: using the saved copy (${e.message})")
+            }
             return file.absolutePath
         }
 
