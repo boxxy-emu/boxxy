@@ -180,8 +180,12 @@ class MainActivity : ComponentActivity() {
         // Dark theme — force light (white) status bar icons
         WindowInsetsControllerCompat(window, window.decorView)
             .isAppearanceLightStatusBars = false
+        if (com.boxxy.update.Updater.autoCheckDue(this)) {
+            com.boxxy.update.checkForUpdate(this, manual = false)
+        }
         setContent {
             XemuTheme {
+                com.boxxy.update.UpdateDialog()
                 val navController = rememberNavController()
                 val startDest = if (settingsViewModel.isSetupComplete) "library" else "setup"
                 NavHost(navController = navController, startDestination = startDest) {

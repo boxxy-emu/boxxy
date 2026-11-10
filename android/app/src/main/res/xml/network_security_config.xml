@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HTTPS everywhere (the platform default), except this device's own
+     loopback: a test stand-in for GitHub's update endpoint is reached over
+     `adb reverse` at http://127.0.0.1 (update/Updater.kt). -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

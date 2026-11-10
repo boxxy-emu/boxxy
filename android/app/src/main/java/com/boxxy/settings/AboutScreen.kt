@@ -11,7 +11,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.boxxy.BuildConfig
+import com.boxxy.update.UpdateState
+import com.boxxy.update.Updater
+import com.boxxy.update.checkForUpdate
 
 private const val REPO_URL = "https://github.com/boxxy-emu/boxxy"
 
@@ -58,6 +65,38 @@ fun AboutScreen(navController: NavController) {
                     AboutRow("Device", deviceName())
                     AboutRow("Android", android.os.Build.VERSION.RELEASE)
                     AboutRow("ABI", android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "—")
+                }
+            }
+
+            SettingsSectionLabel("Updates")
+            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    var auto by remember { mutableStateOf(Updater.autoCheck(context)) }
+                    SettingsSwitchRow(
+                        label = "Check for updates automatically",
+                        subtitle = "Once a day, when Boxxy starts, it asks GitHub whether " +
+                                   "a newer release is out. Nothing is installed without " +
+                                   "your OK.",
+                        checked = auto,
+                    ) {
+                        auto = it
+                        Updater.setAutoCheck(context, it)
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        OutlinedButton(
+                            onClick = { checkForUpdate(context, manual = true) },
+                            enabled = !UpdateState.checking,
+                        ) { Text(if (UpdateState.checking) "Checking…" else "Check for updates") }
+                        UpdateState.status?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
 

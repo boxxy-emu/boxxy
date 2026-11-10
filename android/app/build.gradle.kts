@@ -53,6 +53,11 @@ android {
         versionName = boxxyVersionName
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("String", "COMMIT_DATE", "\"$boxxyCommitDate\"")
+        // Where the update check looks.  -PboxxyUpdateUrl=http://127.0.0.1:8000/latest
+        // points a test build at a local stand-in for GitHub (over adb reverse).
+        val updateUrl = (project.findProperty("boxxyUpdateUrl") as String?)
+            ?: "https://api.github.com/repos/boxxy-emu/boxxy/releases/latest"
+        buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
