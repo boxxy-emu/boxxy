@@ -3325,9 +3325,10 @@ bool save_snapshot(const char *name, bool overwrite, const char *vmstate,
     return ret == 0;
 }
 
-#ifdef XBOX
+#if defined(XBOX) && (defined(__ANDROID__) || defined(ANDROID))
 /*
- * Fast save states (Android).
+ * Fast save states (Android; only the Android front end calls these, and
+ * the file handling below is POSIX).
  *
  * save_snapshot() writes the ~70 MB machine state into the qcow2 image while
  * the VM is stopped: 460 ms when overwriting a state, 740 ms for a new one,
