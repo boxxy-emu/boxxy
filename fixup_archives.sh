@@ -25,8 +25,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$SCRIPT_DIR/build"
-NDK_PATH="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}"
-LLVM_AR="$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
+source "$SCRIPT_DIR/android/tools/ndk-env.sh"
+# --no-ninja: build_android_libs.sh has just built the archives itself.
+RUN_NINJA=1
+[[ "${1:-}" == "--no-ninja" ]] && RUN_NINJA=0
 
 # ── Sanity checks ─────────────────────────────────────────────────────────────
 
@@ -42,8 +44,10 @@ fi
 
 # ── Step 1: rebuild Meson archives ───────────────────────────────────────────
 
-echo "==> Step 1: ninja -C build"
-ninja -C "$BUILD"
+if [[ $RUN_NINJA == 1 ]]; then
+    echo "==> Step 1: ninja -C build"
+    ninja -C "$BUILD"
+fi
 
 # ── Step 2: slim libqemu-i386-softmmu.a ──────────────────────────────────────
 # Replace the fat thin archive (which embeds references to objects from

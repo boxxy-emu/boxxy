@@ -1,0 +1,73 @@
+name: Android
+
+# Builds the release APK, the way a developer machine does (CLAUDE.md):
+# vcpkg libraries, the Meson core (rebuild_meson.sh), then Gradle.  macOS, as
+# the build scripts are developed and tested there.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      NDK_VERSION: 29.0.14206865
+      VCPKG_COMMIT: 26283ac5e8a068561a718ce18b169bfad84c7dab
+      VCPKG_ROOT: ${{ github.workspace }}/../vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/../vcpkg-cache
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out libadrenotools
+        run: git submodule update --init --recursive android/app/libs/libadrenotools
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install host tools
+        run: brew install meson ninja pkgconf autoconf automake libtool
+
+      - name: Install the NDK and CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+              "ndk;$NDK_VERSION" "cmake;3.22.1"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ env.VCPKG_COMMIT }}-${{ env.NDK_VERSION }}-${{ hashFiles('vcpkg-overlay-ports/**', 'android/tools/vcpkg-deps.sh') }}
+          restore-keys: vcpkg-${{ env.VCPKG_COMMIT }}-${{ env.NDK_VERSION }}-
+
+      - name: Build vcpkg libraries
+        run: |
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" checkout "$VCPKG_COMMIT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          android/tools/vcpkg-deps.sh
+
+      - name: Build the core (Meson)
+        run: ./rebuild_meson.sh
+
+      - name: Build the APK (Gradle)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boxxy-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14

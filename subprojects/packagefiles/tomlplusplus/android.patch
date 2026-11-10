@@ -1,0 +1,43 @@
+diff --git a/include/toml++/impl/parser.hpp b/include/toml++/impl/parser.hpp
+index c794c5e..200121c 100644
+--- a/include/toml++/impl/parser.hpp
++++ b/include/toml++/impl/parser.hpp
+@@ -345,7 +345,7 @@ TOML_NAMESPACE_START
+ 		///				A toml::parse_result.
+ 		TOML_NODISCARD
+ 		TOML_ALWAYS_INLINE
+-		parse_result operator"" _toml(const char* str, size_t len)
++		parse_result operator""_toml(const char* str, size_t len)
+ 		{
+ 			return parse(std::string_view{ str, len });
+ 		}
+diff --git a/include/toml++/impl/path.hpp b/include/toml++/impl/path.hpp
+index 5bd0ef3..831c0bc 100644
+--- a/include/toml++/impl/path.hpp
++++ b/include/toml++/impl/path.hpp
+@@ -790,7 +790,7 @@ TOML_NAMESPACE_START
+ 		/// \returns	A #toml::path generated from the string literal.
+ 		TOML_NODISCARD
+ 		TOML_ALWAYS_INLINE
+-		path operator"" _tpath(const char* str, size_t len)
++		path operator""_tpath(const char* str, size_t len)
+ 		{
+ 			return path(std::string_view{ str, len });
+ 		}
+diff --git a/meson.build b/meson.build
+index 46e46c6..9c557dc 100644
+--- a/meson.build
++++ b/meson.build
+@@ -167,11 +167,10 @@ endif
+ # *** they are not forwarded to dependents when using this as a submodule. ***
+ #-----------------------------------------------------------------------------------------------------------------------
+ 
+-global_overrides = [ ]
++global_overrides = [ 'werror=false' ]
+ if is_pedantic
+ 	global_overrides += [
+ 		'warning_level=3',
+-		'werror=true',
+ 		]
+ endif
+ 

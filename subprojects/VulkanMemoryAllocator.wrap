@@ -1,4 +1,6 @@
 [wrap-git]
 url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
-revision = 3aa921224c154a0d2c43912bc88e1c42ce1f7607
+revision = 1d8f600fd424278486eade7ed3e877c99f0846b1
 depth = 1
+# The revision the Android build is tested with (a wrap bump never reached
+# an existing checkout, so the device builds stayed here).

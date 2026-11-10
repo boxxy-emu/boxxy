@@ -1,0 +1,103 @@
+diff --git a/imconfig.h b/imconfig.h
+index 8f8bc3b..fbce649 100644
+--- a/imconfig.h
++++ b/imconfig.h
+@@ -14,6 +14,10 @@
+ 
+ #pragma once
+ 
++#ifdef __ANDROID__
++#define IMGUI_IMPL_OPENGL_ES3
++#endif
++
+ //---- Define assertion handler. Defaults to calling assert().
+ // If your macro uses multiple statements, make sure is enclosed in a 'do { .. } while (0)' block so it can be used as a single statement.
+ //#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
+diff --git a/imgui.cpp b/imgui.cpp
+index 5081454..09b7ed7 100644
+--- a/imgui.cpp
++++ b/imgui.cpp
+@@ -1164,7 +1164,9 @@ CODE
+ #define IMGUI_DEBUG_NAV_RECTS       0   // Display the reference navigation rectangle for each window
+ 
+ // When using CTRL+TAB (or Gamepad Square+L/R) we delay the visual a little in order to reduce visual noise doing a fast switch.
++#if 0
+ static const float NAV_WINDOWING_HIGHLIGHT_DELAY            = 0.20f;    // Time before the highlight and screen dimming starts fading in
++#endif
+ static const float NAV_WINDOWING_LIST_APPEAR_DELAY          = 0.15f;    // Time before the window list starts to appear
+ 
+ static const float NAV_ACTIVATE_HIGHLIGHT_TIMER             = 0.10f;    // Time to highlight an item activated by a shortcut.
+@@ -1213,7 +1215,9 @@ static void             UpdateWindowInFocusOrderList(ImGuiWindow* window, bool j
+ 
+ // Navigation
+ static void             NavUpdate();
++#if 0
+ static void             NavUpdateWindowing();
++#endif
+ static void             NavUpdateWindowingOverlay();
+ static void             NavUpdateCancelRequest();
+ static void             NavUpdateCreateMoveRequest();
+@@ -13600,6 +13604,7 @@ bool ImGui::IsWindowNavFocusable(ImGuiWindow* window)
+     return window->WasActive && window == window->RootWindow && !(window->Flags & ImGuiWindowFlags_NoNavFocus);
+ }
+ 
++#if 0
+ static ImGuiWindow* FindWindowNavFocusable(int i_start, int i_stop, int dir) // FIXME-OPT O(N)
+ {
+     ImGuiContext& g = *GImGui;
+@@ -13608,7 +13613,9 @@ static ImGuiWindow* FindWindowNavFocusable(int i_start, int i_stop, int dir) //
+             return g.WindowsFocusOrder[i];
+     return NULL;
+ }
++#endif
+ 
++#if 0
+ static void NavUpdateWindowingTarget(int focus_change_dir)
+ {
+     ImGuiContext& g = *GImGui;
+@@ -13627,10 +13634,12 @@ static void NavUpdateWindowingTarget(int focus_change_dir)
+     }
+     g.NavWindowingToggleLayer = false;
+ }
++#endif
+ 
+ // Windowing management mode
+ // Keyboard: CTRL+Tab (change focus/move/resize), Alt (toggle menu layer)
+ // Gamepad:  Hold Menu/Square (change focus/move/resize), Tap Menu/Square (toggle menu layer)
++#if 0
+ static void ImGui::NavUpdateWindowing()
+ {
+     ImGuiContext& g = *GImGui;
+@@ -13833,6 +13842,7 @@ static void ImGui::NavUpdateWindowing()
+         }
+     }
+ }
++#endif
+ 
+ // Window has already passed the IsWindowNavFocusable()
+ static const char* GetFallbackWindowNameForWindowingList(ImGuiWindow* window)
+diff --git a/meson.build b/meson.build
+index e2f7992..260be35 100644
+--- a/meson.build
++++ b/meson.build
+@@ -4,6 +4,7 @@ project(
+   license: 'MIT',
+   version: '1.91.8',
+   meson_version: '>=0.50.0',
++  default_options: ['werror=false']
+ )
+ 
+ # if host_machine.system() == 'darwin'
+@@ -51,7 +52,11 @@ if metal_dep.found()
+   sources += 'backends/imgui_impl_metal.mm'
+   dependencies += metal_dep
+ endif
+-libgl_dep = dependency('gl', required: get_option('opengl'))
++if cpp.has_header('android/api-level.h')
++  libgl_dep = cpp.find_library('GLESv2', required: get_option('opengl'))
++else
++  libgl_dep = dependency('gl', required: get_option('opengl'))
++endif
+ if libgl_dep.found()
+   sources += 'backends/imgui_impl_opengl3.cpp'
+   dependencies += libgl_dep

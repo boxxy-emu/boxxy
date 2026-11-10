@@ -110,20 +110,25 @@ Boxxy builds in two stages:
    links them against the core, and packages the APK.
 
 You will need:
-- The Android SDK, and NDK 29.
-- [vcpkg](https://github.com/microsoft/vcpkg), with the `arm64-android` triplet
-  dependencies (glib, pixman, libepoxy, SDL3, OpenSSL, zlib, libpng,
-  libsamplerate). Patched ports live in
-  [`vcpkg-overlay-ports`](vcpkg-overlay-ports).
-- Meson and Ninja.
+- The Android SDK, NDK 29.0.14206865 and CMake 3.22.1, and JDK 17 or newer.
+- A clone of [vcpkg](https://github.com/microsoft/vcpkg) at the commit pinned
+  in [`android/tools/vcpkg-deps.sh`](android/tools/vcpkg-deps.sh), which
+  installs the libraries with this repository's patched ports
+  ([`vcpkg-overlay-ports`](vcpkg-overlay-ports)).
+- Meson, Ninja and pkg-config (on macOS also autoconf, automake and libtool,
+  for vcpkg).
 
 ```bash
 export ANDROID_NDK_HOME=~/Library/Android/sdk/ndk/29.0.14206865
 export VCPKG_ROOT=~/projects/vcpkg
 
+android/tools/vcpkg-deps.sh     # once: the arm64-android libraries
 ./rebuild_meson.sh              # stage 1: configure and build the core
 cd android && ./gradlew assembleRelease
 ```
+
+The [Android workflow](.github/workflows/android.yml) runs exactly these steps
+on every push and keeps the APK as a build artifact.
 
 [`CLAUDE.md`](CLAUDE.md) documents the build in detail: the archive steps
 needed after editing core files, compiler flags that must match on both sides,

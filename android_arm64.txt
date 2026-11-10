@@ -1,8 +1,8 @@
-# ndk_path and vcpkg_root come from build/android_paths.txt, which
-# rebuild_meson.sh writes from $ANDROID_NDK_HOME and $VCPKG_ROOT and passes as
-# the first cross file (Meson lets a later cross file use its constants).
+# ndk_path, ndk_host and vcpkg_root come from build/android_paths.txt, which
+# rebuild_meson.sh writes (android/tools/ndk-env.sh) and passes as the first
+# cross file (Meson lets a later cross file use its constants).
 [constants]
-toolchain = ndk_path + '/toolchains/llvm/prebuilt/darwin-x86_64/bin/'
+toolchain = ndk_path + '/toolchains/llvm/prebuilt/' + ndk_host + '/bin/'
 api = '28'
 
 [binaries]

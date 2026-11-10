@@ -1,8 +1,9 @@
 #!/bin/bash
-export NDK_PATH="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}"
-VCPKG_ROOT="${VCPKG_ROOT:-$HOME/projects/vcpkg}"
-export TOOLCHAIN="$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin"
-export ANDROID_NDK_ROOT="$NDK_PATH"
+# Configure the Meson core build from scratch (build/), then build the
+# libraries CMake links (build_android_libs.sh).  See CLAUDE.md.
+set -euo pipefail
+cd "$(dirname "$0")"
+source android/tools/ndk-env.sh
 
 # Add toolchain to path
 export PATH="$TOOLCHAIN:$PATH"
@@ -15,6 +16,7 @@ mkdir build
 cat > build/android_paths.txt <<EOF
 [constants]
 ndk_path = '$NDK_PATH'
+ndk_host = '$NDK_HOST'
 vcpkg_root = '$VCPKG_ROOT'
 EOF
 
@@ -88,4 +90,4 @@ meson setup build \
 # Build only the static library targets needed by CMakeLists.txt.
 # Do NOT run plain "ninja -C build" — it will also try to link qemu-system-i386
 # as an Android executable, which fails (no main(), no EGL in sysroot).
-bash "$(dirname "$0")/build_android_libs.sh"
+bash ./build_android_libs.sh

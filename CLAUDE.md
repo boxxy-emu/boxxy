@@ -48,6 +48,23 @@ CMake-compiled code may call API 33 NDK functions directly (e.g.
 
 ## Build Commands
 
+### From scratch, and CI
+
+`.github/workflows/android.yml` builds the release APK on every push (macOS
+runner), from nothing: `android/tools/vcpkg-deps.sh` (vcpkg pinned, overlay
+ports), `./rebuild_meson.sh` (configure, then `build_android_libs.sh` builds
+the linked libraries with `-k 0` and assembles `libsystem.a`/`libcommon.a`,
+then `fixup_archives.sh --no-ninja`), then Gradle. Paths come from
+`android/tools/ndk-env.sh`. Desktop builds are not built here (xemu covers
+them).
+
+Meson subprojects are downloaded (gitignored), so **a local edit to one never
+reaches a fresh checkout**: put it in `subprojects/packagefiles/<name>/` and
+the wrap's `diff_files` (as imgui, tomlplusplus and slirp do), and
+`git add -f` the patch. A wrap revision bump does not update an existing
+download either. CI's APK is signed with its own debug key, so it does not
+install over a locally built one.
+
 ### Meson (core engine — run first, then only when core C files change)
 
 ```bash
@@ -444,7 +461,7 @@ From `.github/copilot-instructions.md`: developer style guide is at `docs/devel/
 
 ## Common Pitfalls
 
-- **Shared core files must still build for desktop (CI builds macOS, Linux and Windows).** Android-only code in a file Meson also compiles for desktop -- `__system_property_get`, `<android/...>`, `gettid()`, `ALOG*`, AArch64 `asm` such as `mrs cntvct_el0` -- needs an `#if defined(__ANDROID__) || defined(ANDROID)` guard, and so does every *use* of a variable defined inside such a guard. Use `qemu_get_thread_id()` rather than `gettid()`. A desktop compile on this Mac: build a copy of the tree (never this one: `configure` writes `./build`) with `./build.sh -a arm64 --debug` (Homebrew Python 3.13 with PyYAML), then `ninja -C build -k 0` to list every error at once.
+- **Keep shared core files building for desktop.** No CI job checks it any more (Android only), but it keeps upstream merges and fixes sent back to xemu possible. Android-only code in a file Meson also compiles for desktop -- `__system_property_get`, `<android/...>`, `gettid()`, `ALOG*`, AArch64 `asm` such as `mrs cntvct_el0` -- needs an `#if defined(__ANDROID__) || defined(ANDROID)` guard, and so does every *use* of a variable defined inside such a guard. Use `qemu_get_thread_id()` rather than `gettid()`. A desktop compile on this Mac: build a copy of the tree (never this one: `configure` writes `./build`) with `./build.sh -a arm64 --debug` (Homebrew Python 3.13 with PyYAML), then `ninja -C build -k 0` to list every error at once.
 - **Never put C++ code in `.c` files.** `ui/xemu.c` and `ui/xemu-input.c` are compiled as C. ImGui types (`ImGuiContext*`, `ImGui::*`) and `std::` types are forbidden in these files.
 - **`ui/xemu.c` is compiled by both Meson and CMake.** After modifying it, you may need to run `ninja -C build` to regenerate the Meson object if other Meson-linked code depends on it, but the CMake-compiled version is what the Android APK uses.
 - **Meson object files are cached.** After a Meson rebuild, Android Studio may use stale cached CMake data. Always **Refresh Linked C++ Projects** when the Meson build output changes.
