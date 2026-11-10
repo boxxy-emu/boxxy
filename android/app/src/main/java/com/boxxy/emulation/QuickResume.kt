@@ -41,9 +41,12 @@ object QuickResume {
     private fun marker(context: Context, gameId: String) =
         File(File(context.filesDir, "resume"), gameId)
 
-    /** When the resume point was saved, or null if there is none. */
-    fun savedAt(context: Context, gameId: String): Long? =
-        marker(context, gameId).takeIf { it.exists() }?.lastModified()
+    /** When the resume point was saved, or null if there is none: the time
+     *  markSaved wrote into the marker (a copied file gets a new mtime). */
+    fun savedAt(context: Context, gameId: String): Long? {
+        val f = marker(context, gameId).takeIf { it.exists() } ?: return null
+        return runCatching { f.readText().trim().toLong() }.getOrNull() ?: f.lastModified()
+    }
 
     fun markSaved(context: Context, gameId: String) {
         val f = marker(context, gameId)
