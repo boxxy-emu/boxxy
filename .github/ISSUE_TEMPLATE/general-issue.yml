@@ -1,78 +1,52 @@
 name: General Issue
-description: Report a general issue with xemu, not specific to one or more particular titles
-labels: [bug, triage]
+description: A problem with Boxxy that isn't about one particular game
+labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report! This template is for reporting non-title-specific issues with xemu.
+        Thanks for reporting! This template is for problems with the app itself: setup, the library, controls, settings, the dual-screen panel or online play setup.
 
-        Before submitting this bug report, please check the pre-submission checklist:
-        - Have you read the [documentation](https://xemu.app/docs)?
-        - Have you checked the [FAQ](https://xemu.app/docs/faq/)?
-        - Are you using the latest version of xemu?
-        - Have you joined the Discord community to ask for help?
-        - Have you checked to see if this issue has already been submitted?
-        - Have you tried updating your platform drivers?
-        - Have you ruled out a bad dump of your game disc?
+        Boxxy is an independent Android port of xemu. Please report Boxxy problems here, not to the xemu project.
 
-        If you have questions about how to provide the information below, join the Discord server to get help from the community.
+        Before submitting, please check that this hasn't been reported already.
   - type: textarea
     id: bug-description
     attributes:
-      label: Bug Description
+      label: What happens
       description: |
-        A brief description of the problem, including steps to reproduce the issue and any relevant screenshots of the problem.
+        What goes wrong, and the steps to make it happen. Screenshots or a short video help a lot.
 
-        Tip: You can attach images by clicking this area to highlight it and then dragging files in.
+        Tip: you can attach images by clicking this area and dragging files in.
       placeholder: |
-        Controller force feedback no longer works after reconnecting.
+        The controller stops working after the screen turns off.
 
-        Steps to reproduce this issue:
-        1. Launch xemu
-        2. Connect controller (PlayStation Dual Shock 4 CUH-ZCT1U) to system
-        3. Open Input dialog within xemu
-        4. On Port 1, select DS4 controller
-        5. Hold right trigger to activate rumble motors in input tester
-        6. Right rumble motor is activated
-        5. Disconnect controller from system by unplugging
-        6. Reconnect, xemu automatically rebinds
-        7. Hold trigger to activate rumble motors in input tester
-        8. Force feedback does not work
+        1. Start any game
+        2. Let the screen turn off, then wake it
+        3. The buttons do nothing until the app is restarted
     validations:
       required: true
   - type: textarea
     id: expected-behavior
     attributes:
-      label: Expected Behavior
-      description: A brief description of the expected behavior.
-      placeholder: |
-        Rumble should work after reconnecting.
+      label: What you expected
+      placeholder: The controller works again after waking the screen.
     validations:
       required: true
   - type: textarea
-    id: xemu-version
+    id: device
     attributes:
-      label: xemu Version
-      description: Affected xemu version. You can find the xemu version within xemu by navigating to <kbd>Help</kbd>&rarr;<kbd>About</kbd>. If known, include the last known-working version of xemu.
+      label: Device and Boxxy version
+      description: The Boxxy version and your Android version are under Settings → Advanced.
       placeholder: |
-        0.0.0-00-g0000000000
-
-        Last working in: 0.0.0-00-g0000000000
+        Boxxy version: 1.0
+        Device: AYN Thor (Snapdragon 8 Gen 2)
+        Android version: 13
+        Controller: built-in
     validations:
       required: true
-  - type: textarea
-    id: system-information
-    attributes:
-      label: System Information
-      description: Basic information about your system.
-      placeholder: |
-        OS: Windows 10
-        CPU: Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz
-        GPU: NVIDIA Quadro P2000
-        GPU Driver: 3.3.0 NVIDIA 450.119.03
   - type: textarea
     id: additional-context
     attributes:
-      label: Additional Context
-      description: Any additional information or log output.
+      label: Anything else
+      description: Whether it worked in an earlier Boxxy version, logs, or other details.

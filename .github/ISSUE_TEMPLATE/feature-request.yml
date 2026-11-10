@@ -1,37 +1,29 @@
 name: Feature Request
-description: Request a new feature for xemu
+description: Suggest something for Boxxy
 labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this feature request!
+        Thanks for the suggestion! Please check that it hasn't been requested already.
 
-        Before submitting this request, please check the pre-submission checklist:
-        - Have you read the [documentation](https://xemu.app/docs)?
-        - Have you checked the [FAQ](https://xemu.app/docs/faq/)?
-        - Have you searched to see if this feature has been requested before?
-
-        If you have questions about how to provide the information below, join the Discord server to get help from the community.
+        Boxxy is an independent Android port of xemu. Ideas for the emulator in general may also suit the xemu project, but please don't send it Boxxy requests.
   - type: textarea
     id: feature-request
     attributes:
-      label: Feature Request
+      label: The idea
       description: |
-        A brief description of the requested feature. If appropriate, include screenshots or videos.
+        What you would like Boxxy to do, and why. Mockups or screenshots are welcome.
 
-        Tip: You can attach images by clicking this area to highlight it and then dragging files in.
+        Tip: you can attach images by clicking this area and dragging files in.
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
       label: Alternatives
-      description: Possible alternative options that you have considered.
-    validations:
-      required: false
+      description: Other ways you've considered, or how you work around it today.
   - type: textarea
     id: additional-context
     attributes:
-      label: Additional Context
-      description: Any other context or screenshots about the feature request.
+      label: Anything else

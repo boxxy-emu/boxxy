@@ -1,0 +1,66 @@
+name: Game Issue
+description: A problem with a particular game in Boxxy
+title: "Game name: short description"
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! This template is for problems with one game: graphics, sound, speed, crashes or online play.
+
+        Boxxy is an independent Android port of xemu. Please report Boxxy problems here, not to the xemu project.
+
+        Before submitting, please check that this hasn't been reported already, and that the game image is a good dump.
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      description: The game's name and region, and its version if you know it.
+      placeholder: Halo - Combat Evolved (USA) (Rev 2)
+    validations:
+      required: true
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: What happens
+      description: |
+        What goes wrong, and the steps to make it happen. Screenshots or a short video help a lot.
+
+        Tip: you can attach images by clicking this area and dragging files in.
+      placeholder: |
+        The ammo counter flickers during the first mission.
+
+        1. Start a new campaign
+        2. Pick up the assault rifle
+        3. The ammo counter flickers every few seconds
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: What you expected
+      placeholder: The ammo counter stays visible.
+    validations:
+      required: true
+  - type: textarea
+    id: device
+    attributes:
+      label: Device and Boxxy version
+      description: The Boxxy version and your Android version are under Settings → Advanced.
+      placeholder: |
+        Boxxy version: 1.0
+        Device: AYN Thor (Snapdragon 8 Gen 2)
+        Android version: 13
+        Renderer: Vulkan (system driver / custom driver name)
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings you changed
+      description: Any graphics or advanced settings, for this game or overall, that are not at their defaults.
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Anything else
+      description: Whether it worked in an earlier Boxxy version, logs, or other details.
