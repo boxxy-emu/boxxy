@@ -555,6 +555,11 @@ void x86_refresh_fpu_mode(void)
 
 }
 #endif
+#if !defined(__ANDROID__) && !defined(ANDROID)
+/* Inline condition codes are tuned and validated on Android only; desktop
+ * builds keep upstream's lazy flag computation. */
+static const int g_cc_inline = 0, g_cc_logic = 0, g_cc_validate = 0;
+#endif
 
 
 /*

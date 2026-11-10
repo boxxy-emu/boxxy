@@ -432,7 +432,8 @@ gl_internal_format_to_s3tc_enum(GLint gl_internal_format)
     }
 }
 
-#if defined(__ANDROID__) || defined(ANDROID)
+/* GLES workarounds (Android): used only when the flags below are set, but
+ * compiled everywhere because the upload code that tests them is shared. */
 /* Expand A4R4G4B4 (16-bit, little-endian ARGB nibble order) to RGBA8.
  * The Android code path replaces GL_UNSIGNED_SHORT_4_4_4_4_REV with
  * GL_UNSIGNED_SHORT_4_4_4_4, which completely scrambles the nibble order
@@ -499,7 +500,6 @@ static uint8_t *expand_a8_to_rgba8(const uint8_t *src, size_t pixel_count)
     }
     return dst;
 }
-#endif
 
 static void upload_gl_texture(GLenum gl_target,
                               const TextureShape s,
@@ -583,6 +583,7 @@ static void upload_gl_texture(GLenum gl_target,
         f.gl_swizzle_mask[2] = f.gl_swizzle_mask[3] = 0;
     }
 #else
+    bool is_a4r4g4b4_expand = false;
     bool is_a8_expand = false;
     bool is_a1r5g5b5_expand = false;
     GLenum tex_gl_format = f.gl_format;

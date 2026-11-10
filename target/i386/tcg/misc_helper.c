@@ -28,9 +28,11 @@
 #include "accel/tcg/cpu-ldst.h"
 #include "exec/watchpoint.h"
 #include "tcg/insn-start-words.h"
-#include <sys/system_properties.h>
 #include "system/address-spaces.h"
 #include "system/memory.h"
+#if defined(__ANDROID__) || defined(ANDROID)
+/* The guest-memory diagnostics below (debug.xemu.*) are Android-only. */
+#include <sys/system_properties.h>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <sys/mman.h>
@@ -38,6 +40,7 @@
 #include <sys/syscall.h>
 #include <linux/hw_breakpoint.h>
 #include <linux/perf_event.h>
+#endif
 
 /*
  * NOTE: the translator must set DisasContext.cc_op to CC_OP_EFLAGS
@@ -255,6 +258,10 @@ unsigned long long xemu_idle_halts;
 uint64_t xemu_idle_halt_t0;       /* cntvct at the halt, 0 when running */
 int xemu_last_irq_vec = -1;       /* hardware vector last delivered */
 
+extern void (*xemu_wp_log_hook)(CPUState *cpu, vaddr addr, vaddr len,
+                                uintptr_t ra);
+
+#if defined(__ANDROID__) || defined(ANDROID)
 /*
  * DIAGNOSTIC (debug.xemu.kprcb_watch=1): log every guest store to
  * Prcb->CurrentThread / NextThread (KPRCB 0x80035bdc +0x28/+0x2c) and to the
@@ -268,8 +275,6 @@ int xemu_last_irq_vec = -1;       /* hardware vector last delivered */
  */
 #define XEMU_BP_LOG 0x1000
 #define XEMU_KW_N   256
-extern void (*xemu_wp_log_hook)(CPUState *cpu, vaddr addr, vaddr len,
-                                uintptr_t ra);
 extern unsigned xemu_int_head;
 static struct xemu_kw {
     uint64_t t;
@@ -825,6 +830,13 @@ void xemu_kprcb_watch_dump(void)
                 e->stk[5]);
     }
 }
+#else
+/* Desktop: no diagnostics (they use Android properties and Linux perf). */
+static void xemu_kprcb_watch_arm(CPUState *cs) {}
+static void xemu_thread_dump_poll(CPUState *cs) {}
+void xemu_kprcb_watch_dump(void);
+void xemu_kprcb_watch_dump(void) {}
+#endif
 
 /*
  * Guest clock wait -> hlt (OPEN-WORK C14).  Halo's frame limiter spins
@@ -861,7 +873,9 @@ void helper_xemu_spin_wait(CPUX86State *env, uint32_t ctr)
     }
     xemu_spin_halts++;
     xemu_idle_halts++;
+#if defined(__aarch64__)
     asm volatile("mrs %0, cntvct_el0" : "=r"(xemu_idle_halt_t0));
+#endif
     xemu_last_irq_vec = -1;
     cs = env_cpu(env);
     cs->halted = 1;
@@ -893,7 +907,9 @@ void helper_xemu_idle(CPUX86State *env)
         return;
     }
     xemu_idle_halts++;
+#if defined(__aarch64__)
     asm volatile("mrs %0, cntvct_el0" : "=r"(xemu_idle_halt_t0));
+#endif
     xemu_last_irq_vec = -1;
     cs = env_cpu(env);
     do_end_instruction(env);

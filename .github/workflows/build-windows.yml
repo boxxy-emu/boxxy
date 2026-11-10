@@ -17,7 +17,7 @@ jobs:
         arch: [x86_64, arm64]
         configuration: [debug, release]
     container:
-      image: ghcr.io/xemu-project/xemu-win64-toolchain${{ matrix.arch == 'x86_64' && '-gcc:sha-18018f1' || ':sha-0d06ce8' }}
+      image: ghcr.io/xemu-project/xemu-win64-toolchain${{ matrix.arch == 'x86_64' && '-gcc:sha-2881edd' || ':sha-0d06ce8' }}
     defaults:
       run:
         shell: bash
@@ -32,6 +32,10 @@ jobs:
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
       with:
         name: src
+    - name: Install curl
+      run: |
+        apt-get update
+        apt-get install -qy curl
     - name: Install zstd
       if: ${{ matrix.arch == 'arm64' }}
       run: apt-get install zstd

@@ -202,7 +202,7 @@ int qemu_init_main_loop(Error **errp)
     GSource *src;
 
 #if defined(XBOX) || defined(__ANDROID__) || defined(ANDROID)
-    fprintf(stderr, "xemu-vl: qemu_init_main_loop: creating thread-default context (thread %ld)\n", (long)gettid());
+    fprintf(stderr, "xemu-vl: qemu_init_main_loop: creating thread-default context (thread %ld)\n", (long)qemu_get_thread_id());
     qemu_main_context = g_main_context_new();
     assert(qemu_main_context != NULL);
     g_main_context_push_thread_default(qemu_main_context);

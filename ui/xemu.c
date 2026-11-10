@@ -906,6 +906,12 @@ void xemu_android_free_state_names(char **names, int count)
 #else
 #define ALOGI(...) fprintf(stderr, __VA_ARGS__)
 #define ALOGE(...) fprintf(stderr, __VA_ARGS__)
+
+/* Desktop renders on the main thread, so every caller is on it. */
+bool xemu_is_main_thread(void)
+{
+    return true;
+}
 #endif
 
 #include "data/xemu_64x64.png.h"
@@ -2416,6 +2422,7 @@ void xemu_android_benchmark_start(int frames)
 {
     /* Pick up any A/B switches that were flipped since the last run, so
      * configurations can be alternated without relaunching. */
+#if defined(__ANDROID__) || defined(ANDROID)
     {
         extern void jc_refresh_property(void);
         extern void vcpu_affinity_refresh(void);
@@ -2424,6 +2431,7 @@ void xemu_android_benchmark_start(int frames)
         vcpu_affinity_refresh();
         x86_refresh_fpu_mode();
     }
+#endif
 
     if (frames <= 0) {
         frames = 600;
@@ -4479,9 +4487,10 @@ static void *qemu_main(void *opaque)
     GMainContext *ctx = g_main_context_new();
     g_main_context_push_thread_default(ctx);
 #endif
-    ALOGI("qemu_main thread starting (thread %ld)...", (long)gettid());
+    ALOGI("qemu_main thread starting (thread %ld)...", (long)qemu_get_thread_id());
     qemu_init(gArgc, gArgv);
     ALOGI("qemu_main: qemu_init returned. Starting main loop...");
+#if defined(__ANDROID__) || defined(ANDROID)
     {
         /* Apply the debug.xemu.* CPU switches now, not only when a benchmark
          * starts, so a boot-time behaviour can be bisected with them. */
@@ -4490,6 +4499,7 @@ static void *qemu_main(void *opaque)
         x86_refresh_fpu_mode();
         jc_refresh_property();
     }
+#endif
     exit_status = qemu_main_loop();
     ALOGI("qemu_main: main loop returned status %d", exit_status);
     qatomic_set(&qemu_exiting, true);
@@ -4567,7 +4577,7 @@ int xemu_core_main(int argc, char **argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
-    ALOGI("xemu_core_main started (thread %ld), argc=%d", (long)gettid(), argc);
+    ALOGI("xemu_core_main started (thread %ld), argc=%d", (long)qemu_get_thread_id(), argc);
     for (int i = 0; i < argc; i++) {
         ALOGI("  argv[%d] = %s", i, argv[i]);
     }

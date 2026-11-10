@@ -139,7 +139,8 @@ static void tcg_out_mb(TCGContext *s, unsigned bar);
 static void tcg_out_br(TCGContext *s, TCGLabel *l);
 static void tcg_out_set_carry(TCGContext *s);
 static void tcg_out_set_borrow(TCGContext *s);
-#if defined(__ANDROID__) || defined(ANDROID)
+/* Boxxy's TCG tuning and measurement knobs: plain ints, 0 (off) unless the
+ * Android build sets them, defined everywhere because shared code reads them. */
 #define XEMU_TCG_NB_OPC 512
 unsigned long long xemu_op_bytes[XEMU_TCG_NB_OPC];
 int g_tb_pad_bytes;   /* debug.xemu.tb_pad, measurement only */
@@ -191,7 +192,6 @@ const char *xemu_tcg_op_name(unsigned opc)
     }
     return tcg_op_defs[opc].name ? tcg_op_defs[opc].name : "?";
 }
-#endif
 
 static void tcg_out_op(TCGContext *s, TCGOpcode opc, TCGType type,
                        const TCGArg args[TCG_MAX_OP_ARGS],

@@ -2312,6 +2312,15 @@ static void tcg_out_qemu_st_direct(TCGContext *s, MemOp memop,
     }
 }
 
+/* Tuning knobs, defined in tcg.c (0 unless the Android build sets them). */
+extern int g_ldst_pad_bytes;
+extern int g_reserve_x15;
+extern int g_ldst_stub;
+extern int g_ldapr;
+extern int g_ldapr_lat;
+extern int g_ldapr_uxtw;
+extern int g_xemu_x87_rc;
+extern int g_mb_mode;
 #if defined(__ANDROID__) || defined(ANDROID)
 /*
  * debug.xemu.ldst_pad=N emits N bytes of NOPs into the *executed* guest
@@ -2326,14 +2335,6 @@ static void tcg_out_qemu_st_direct(TCGContext *s, MemOp memop,
  * and the added instruction count is known exactly, so the two effects can be
  * told apart.
  */
-extern int g_ldst_pad_bytes;
-extern int g_reserve_x15;
-extern int g_ldst_stub;
-extern int g_ldapr;
-extern int g_ldapr_lat;
-extern int g_ldapr_uxtw;
-extern int g_xemu_x87_rc;
-extern int g_mb_mode;
 
 static void xemu_ldst_pad(TCGContext *s)
 {

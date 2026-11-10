@@ -504,8 +504,8 @@ void pgraph_gl_sync(NV2AState *d)
         if (_dt > 50) {
             ALOGI_DISP("pgraph_gl_sync: glo_set_current(display) took %"PRId64"ms", _dt);
         }
-    }
 #endif
+    }
 #if defined(__ANDROID__) || defined(ANDROID)
     /* Before render_display: sample center pixel of surface->gl_buffer
      * to determine whether NV2A has rendered any content into the surface. */
