@@ -27,6 +27,10 @@ if [[ -e "$KEYSTORE" ]]; then
     echo "(Replacing it would stop updates installing over existing copies.)" >&2
     exit 1
 fi
+if [[ ! -t 0 ]]; then
+    echo "Run this in a terminal window: it asks for the key's password." >&2
+    exit 1
+fi
 if ! command -v keytool > /dev/null; then
     echo "keytool not found: install a JDK (17 or newer)." >&2
     exit 1
