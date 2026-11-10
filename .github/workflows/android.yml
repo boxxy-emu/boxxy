@@ -3,6 +3,12 @@ name: Android
 # Builds the release APK, the way a developer machine does (CLAUDE.md):
 # vcpkg libraries, the Meson core (rebuild_meson.sh), then Gradle.  macOS, as
 # the build scripts are developed and tested there.
+#
+# Pushing a boxxy-v<version> tag also signs the APK with the release key
+# (secrets BOXXY_KEYSTORE_BASE64 and BOXXY_KEYSTORE_PASSWORD, made with
+# android/tools/make-release-key.sh) and creates a *draft* GitHub release with
+# the APK, its checksum and update.json (read by the app's update check).
+# Publishing the draft is left to a person.
 
 on:
   push:
@@ -18,7 +24,10 @@ jobs:
     name: Build APK
     runs-on: macos-15
     timeout-minutes: 240
+    permissions:
+      contents: write         # the draft release, on tag builds only
     env:
+      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/boxxy-v') }}
       NDK_VERSION: 29.0.14206865
       VCPKG_COMMIT: 26283ac5e8a068561a718ce18b169bfad84c7dab
       VCPKG_ROOT: ${{ github.workspace }}/../vcpkg
@@ -64,12 +73,62 @@ jobs:
       - name: Build the core (Meson)
         run: ./rebuild_meson.sh
 
+      - name: Release signing key
+        if: env.IS_RELEASE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BOXXY_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.BOXXY_KEYSTORE_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64" || -z "$KEYSTORE_PASSWORD" ]]; then
+            echo "::error::Release tag, but the signing secrets are not set"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/boxxy-release.jks"
+          echo "BOXXY_RELEASE_STORE_FILE=$RUNNER_TEMP/boxxy-release.jks" >> "$GITHUB_ENV"
+          echo "BOXXY_RELEASE_STORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Build the APK (Gradle)
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: |
+          # Releases are built as users get them: not debuggable.
+          extra=()
+          [[ "$IS_RELEASE" == true ]] && extra=(-PreleaseDebuggable=false)
+          ./gradlew assembleRelease --no-daemon "${extra[@]}"
 
       - uses: actions/upload-artifact@v4
         with:
           name: boxxy-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
+
+      - name: Draft the GitHub release
+        if: env.IS_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#boxxy-v}"
+          bt="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          apk=android/app/build/outputs/apk/release/app-release.apk
+
+          # Signed with the release key, not the debug key; version from the tag.
+          "$bt/apksigner" verify --print-certs "$apk" | tee certs.txt
+          grep -q "DN: CN=Boxxy, O=Boxxy" certs.txt || { echo "::error::not signed with the release key"; exit 1; }
+          badging=$("$bt/aapt2" dump badging "$apk" | head -1)
+          code=$(echo "$badging" | sed -E "s/.*versionCode='([0-9]+)'.*/\1/")
+          name=$(echo "$badging" | sed -E "s/.*versionName='([^']+)'.*/\1/")
+          [[ "$name" == "$version" ]] || { echo "::error::APK version $name, tag $version"; exit 1; }
+
+          out="boxxy-$version.apk"
+          cp "$apk" "$out"
+          sha=$(shasum -a 256 "$out" | cut -d' ' -f1)
+          echo "$sha  $out" > "$out.sha256"
+          cat > update.json <<EOF
+          {"versionName": "$version", "versionCode": $code, "apk": "$out", "sha256": "$sha"}
+          EOF
+
+          gh release create "$tag" --draft --verify-tag \
+              --title "Boxxy $version" \
+              --notes "Release notes for Boxxy $version go here." \
+              "$out" "$out.sha256" update.json

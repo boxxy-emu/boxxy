@@ -29,6 +29,17 @@ val boxxyVersionName = gitDescribe?.removePrefix("boxxy-v") ?: "0.0-dev-g$gitCom
 val boxxyVersionCode = git("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
 val boxxyCommitDate = git("log", "-1", "--format=%cs") ?: "unknown"
 
+/*
+ * Release signing key (android/tools/make-release-key.sh): from
+ * ~/.gradle/gradle.properties on a developer machine, or from the environment
+ * in CI (.github/workflows/release.yml).  Without it, release builds fall back
+ * to the debug key, so anyone can still build from source -- but such a build
+ * won't install over an official one.
+ */
+fun releaseSetting(name: String): String? =
+    (project.findProperty(name) as String?) ?: System.getenv(name)
+val releaseStoreFile = releaseSetting("BOXXY_RELEASE_STORE_FILE")?.let { file(it) }?.takeIf { it.isFile }
+
 android {
     namespace = "com.boxxy"
     compileSdk = 34
@@ -60,14 +71,23 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = releaseSetting("BOXXY_RELEASE_STORE_PASSWORD")
+                keyAlias = releaseSetting("BOXXY_RELEASE_KEY_ALIAS") ?: "boxxy"
+                keyPassword = releaseSetting("BOXXY_RELEASE_STORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Reuse the auto-generated debug keystore so `assembleRelease` can be
-            // installed locally for on-device profiling. Not for distribution --
-            // set up a real release signing config before publishing.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug")
             // `run-as` (needed for simpleperf to read the app's data dir) refuses
             // non-debuggable packages. Doesn't affect optimization/codegen, only
             // allows debugger/profiler attachment -- same "not for distribution"

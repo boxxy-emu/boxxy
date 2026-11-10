@@ -58,6 +58,18 @@ then `fixup_archives.sh --no-ninja`), then Gradle. Paths come from
 `android/tools/ndk-env.sh`. Desktop builds are not built here (xemu covers
 them).
 
+**Releases.** Tag `boxxy-v<version>` (not `v*`: the repo carries xemu's own
+v0.x tags) and push the tag: the same workflow signs the APK with the release
+key from the repo secrets, builds it non-debuggable, checks the signer and
+that the version matches the tag, and opens a draft release with the APK,
+its `.sha256` and `update.json`. The version name and code come from git
+(`build.gradle.kts`). The key is made once by
+`android/tools/make-release-key.sh` (certificate `CN=Boxxy, O=Boxxy`, nothing
+personal; kept in `~/.android/boxxy-release.jks`, settings in
+`~/.gradle/gradle.properties`); local release builds use it when present, and
+stay debuggable unless `-PreleaseDebuggable=false`. Losing the key means no
+update can ever install over existing installs.
+
 Meson subprojects are downloaded (gitignored), so **a local edit to one never
 reaches a fresh checkout**: put it in `subprojects/packagefiles/<name>/` and
 the wrap's `diff_files` (as imgui, tomlplusplus and slirp do), and
