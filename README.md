@@ -115,8 +115,8 @@ You will need:
   in [`android/tools/vcpkg-deps.sh`](android/tools/vcpkg-deps.sh), which
   installs the libraries with this repository's patched ports
   ([`vcpkg-overlay-ports`](vcpkg-overlay-ports)).
-- Meson, Ninja and pkg-config (on macOS also autoconf, automake and libtool,
-  for vcpkg).
+- Meson 1.5 or newer, Ninja and pkg-config, plus autoconf, automake and libtool
+  for vcpkg. macOS and Linux both work.
 
 ```bash
 export ANDROID_NDK_HOME=~/Library/Android/sdk/ndk/29.0.14206865

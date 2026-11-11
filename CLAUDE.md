@@ -50,7 +50,7 @@ CMake-compiled code may call API 33 NDK functions directly (e.g.
 
 ### From scratch, and CI
 
-`.github/workflows/android.yml` builds the release APK on every push (macOS
+`.github/workflows/android.yml` builds the release APK on every push (Ubuntu
 runner), from nothing: `android/tools/vcpkg-deps.sh` (vcpkg pinned, overlay
 ports), `./rebuild_meson.sh` (configure, then `build_android_libs.sh` builds
 the linked libraries with `-k 0` and assembles `libsystem.a`/`libcommon.a`,
