@@ -163,8 +163,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         if (_dirs.value.none { it == uri }) {
             _dirs.value = _dirs.value + uri
             saveDirs()
-            rescan(steamGridDbKey)
         }
+        // Scan even when it is already listed: picking it again is how access
+        // comes back after a reinstall (or a revoked grant), and the earlier
+        // scans could not read it.
+        rescan(steamGridDbKey)
     }
 
     fun removeDirectory(uri: Uri) {
