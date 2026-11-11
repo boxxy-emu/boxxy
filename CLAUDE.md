@@ -126,12 +126,14 @@ PGO for an A/B. The instrumented build writes its counters every 10 s
 CMake links `libqemu-i386-softmmu.a` (a regular static archive). After editing any core file compiled by Meson, a **two-step** rebuild is required:
 
 ```bash
+# NDK paths and $LLVM_AR for this host; a reconfigure (after a cross-file or
+# wrap change) also needs them in the environment, for the CMake subprojects.
+source android/tools/ndk-env.sh
+
 # Step 1: recompile changed .o files and rebuild the Meson fat thin archive
 ninja -C build libqemu-i386-softmmu.a
 
 # Step 2: replace the thin archive with a slim regular archive (own objects only)
-NDK_PATH="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/29.0.14206865}"
-LLVM_AR="$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
 rm -f build/libqemu-i386-softmmu.a
 "$LLVM_AR" rcs build/libqemu-i386-softmmu.a build/libqemu-i386-softmmu.a.p/*.o
 ```

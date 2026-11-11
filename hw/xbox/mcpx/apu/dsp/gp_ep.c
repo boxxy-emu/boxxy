@@ -22,39 +22,6 @@
 #include "hw/xbox/mcpx/apu/apu_int.h"
 #include "qemu/log.h"
 
-/*
- * Diagnostic (XBOX-LIVE.md, 5960 dashboard pfifo aborts): where the DSP's
- * DMA last wrote guest RAM, so a GPU pushbuffer overwritten with what looks
- * like audio samples can be traced to it.  The DSP thread writes, the
- * pfifo thread reads when it aborts: racy, and good enough for that.
- */
-#define APU_WRITE_TRACE_LEN 1024
-static struct { uint32_t paddr, len; } g_apu_writes[APU_WRITE_TRACE_LEN];
-static unsigned g_apu_write_pos;
-
-static void apu_write_trace(hwaddr paddr, uint32_t len)
-{
-    unsigned i = qatomic_fetch_inc(&g_apu_write_pos) % APU_WRITE_TRACE_LEN;
-    g_apu_writes[i].paddr = paddr;
-    g_apu_writes[i].len = len;
-}
-
-void mcpx_apu_report_writes_near(uint32_t addr, uint32_t span)
-{
-    unsigned hits = 0;
-    for (unsigned i = 0; i < APU_WRITE_TRACE_LEN; i++) {
-        uint32_t a = g_apu_writes[i].paddr, n = g_apu_writes[i].len;
-        if (n && a < addr + span && a + n + span > addr) {
-            if (hits++ < 16) {
-                fprintf(stderr, "apu: DSP wrote 0x%x+0x%x near 0x%x\n",
-                        a, n, addr);
-            }
-        }
-    }
-    fprintf(stderr, "apu: %u of the last %u DSP RAM writes near 0x%x\n",
-            hits, APU_WRITE_TRACE_LEN, addr);
-}
-
 static const int16_t ep_silence[256][2] = { 0 };
 
 void mcpx_apu_update_dsp_preference(MCPXAPUState *d)
@@ -142,7 +109,6 @@ static void scatter_gather_rw(MCPXAPUState *d, hwaddr sge_base,
         }
 
         if (dir) {
-            apu_write_trace(paddr, bytes_to_copy);
             memcpy(&d->ram_ptr[paddr], ptr, bytes_to_copy);
             memory_region_set_dirty(d->ram, paddr, bytes_to_copy);
         } else {

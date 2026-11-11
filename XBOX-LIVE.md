@@ -211,8 +211,12 @@ the guest's virtual DNS forwards to the device's resolver, `SLIRP_DNS`).
     suspect; the write-back log now prints anti-aliasing, clip and DMA
     bounds to settle it. The DSP-trace build's quiet run is then most
     likely chance.
-  The diagnostics (pusher trace per method, surface and DSP write checks)
-  cost a little on hot paths; take them out once this is understood.
+  The hot-path diagnostics (pusher trace per method, surface write-back and
+  DSP write checks, the DMA_GET-moved check) were removed before 1.0
+  (2026-11-11); the error-path log dump and the one re-read of a reserved
+  command stay. Next step if it is taken up again: log the surface's
+  anti-aliasing, clip and DMA bounds at a write-back that overlaps the
+  pushbuffer, to see whether the 4.9 MB binding is the wrong size.
 - **Account created and signed in (2026-11-08):** the 5960 dashboard signs
   in to Xbox Live on boot with the new gamertag.
 - Not yet tested:

@@ -468,31 +468,9 @@ static bool pfifo_sync_midstream(void)
 }
 
 /*
- * The last commands the pusher ran, for pfifo_log_bad_pushbuffer: where each
- * header word sat, and for each method call how many data words it was given
- * and how many it consumed.  Only the pfifo thread writes it.
- */
-typedef struct {
-    uint32_t at, word, avail, used;
-} PusherTrace;
-#define PUSHER_TRACE_LEN 64
-static PusherTrace g_pusher_trace[PUSHER_TRACE_LEN];
-static unsigned g_pusher_trace_pos;
-
-static inline void pusher_trace(uint32_t at, uint32_t word, uint32_t avail,
-                                uint32_t used)
-{
-    PusherTrace *t = &g_pusher_trace[g_pusher_trace_pos++ % PUSHER_TRACE_LEN];
-    t->at = at;
-    t->word = word;
-    t->avail = avail;
-    t->used = used;
-}
-
-/*
  * What the pusher saw when the pushbuffer stopped making sense: the words
- * around dma_get and the pointers that led there.  Two such aborts were seen
- * in the 5960 dashboard (XBOX-LIVE.md) with nothing else to go on.
+ * around dma_get and the pointers that led there.  Error paths only: seen
+ * in the 5960 dashboard (XBOX-LIVE.md, open item).
  */
 static void pfifo_log_bad_pushbuffer(NV2AState *d, const char *what,
                                      const uint8_t *dma, hwaddr dma_len,
@@ -507,21 +485,6 @@ static void pfifo_log_bad_pushbuffer(NV2AState *d, const char *what,
             d->pfifo.regs[NV_PFIFO_CACHE1_DMA_STATE],
             d->pfifo.regs[NV_PFIFO_CACHE1_DMA_RSVD_SHADOW],
             d->pfifo.regs[NV_PFIFO_CACHE1_DMA_DATA_SHADOW]);
-    {
-        extern void mcpx_apu_report_writes_near(uint32_t addr, uint32_t span);
-        uint32_t jmp = d->pfifo.regs[NV_PFIFO_CACHE1_DMA_GET_JMP_SHADOW];
-        mcpx_apu_report_writes_near(jmp >= 4 ? jmp - 4 : 0, 0x1000);
-    }
-    for (unsigned k = 0; k < PUSHER_TRACE_LEN; k++) {
-        PusherTrace *t = &g_pusher_trace[(g_pusher_trace_pos + k) %
-                                         PUSHER_TRACE_LEN];
-        if (t->avail == UINT32_MAX) {
-            fprintf(stderr, "pfifo: trace %08x: cmd %08x\n", t->at, t->word);
-        } else {
-            fprintf(stderr, "pfifo: trace %08x:   method %08x avail %u used %u\n",
-                    t->at, t->word, t->avail, t->used);
-        }
-    }
     if (at >= dma_len) {
         return;
     }
@@ -593,7 +556,6 @@ static void pfifo_run_pusher(NV2AState *d)
 
     while (!pfifo_pusher_should_stall(d)) {
         uint32_t dma_get_v = *dma_get;
-        const uint32_t dma_get_start = dma_get_v;
         uint32_t dma_put_v = qatomic_load_acquire(dma_put);
         if (dma_get_v == dma_put_v) {
             static unsigned s_empty_count = 0;
@@ -649,9 +611,6 @@ static void pfifo_run_pusher(NV2AState *d)
                 pfifo_run_puller(d, method_entry, word, word_ptr,
                                  MIN(method_count, num_words_available),
                                  num_words_available);
-            pusher_trace(dma_get_v - 4, method_entry,
-                         MIN(method_count, num_words_available),
-                         (uint32_t)num_words_processed);
             if (num_words_processed < 0) {
                 static unsigned s_puller_stall_count = 0;
                 s_puller_stall_count++;
@@ -697,7 +656,6 @@ static void pfifo_run_pusher(NV2AState *d)
         } else {
             /* no command active - this is the first word of a new one */
             d->pfifo.regs[NV_PFIFO_CACHE1_DMA_RSVD_SHADOW] = word;
-            pusher_trace(dma_get_v - 4, word, UINT32_MAX, 0);
 
             /* match all forms */
             if ((word & 0xe0000003) == 0x20000000) {
@@ -784,25 +742,6 @@ static void pfifo_run_pusher(NV2AState *d)
             }
         }
 
-        /*
-         * The pusher runs a method without pfifo.lock, and the guest can
-         * move DMA_GET meanwhile -- e.g. its handler for the notify
-         * interrupt of a NOP with a parameter, which redirects the stream.
-         * Storing the pusher's own position then threw the guest's away and
-         * ran on into memory holding no commands (the 5960 dashboard's
-         * "Reserved pb command" / "Dma value is out of range" aborts).  The
-         * guest's write wins.
-         */
-        if (qatomic_read(dma_get) != dma_get_start) {
-            static unsigned s_moved;
-            if (s_moved++ < 20) {
-                fprintf(stderr, "pfifo: guest moved DMA_GET 0x%x -> 0x%x "
-                        "during the command at 0x%x (pusher was at 0x%x)\n",
-                        dma_get_start, qatomic_read(dma_get),
-                        dma_get_start, dma_get_v);
-            }
-            continue;
-        }
         /* Release: user_read() polls this without pfifo.lock. */
         qatomic_store_release(dma_get, dma_get_v);
 

@@ -507,30 +507,6 @@ static void download_surface(NV2AState *d, SurfaceBinding *surface, bool force)
 
     // FIXME: Respect write enable at last TOU?
 
-    {
-        /* Diagnostic (XBOX-LIVE.md, 5960 dashboard pfifo aborts): a write-
-         * back landing near the pushbuffer the pusher is reading. */
-        uint32_t get = qatomic_read(&d->pfifo.regs[NV_PFIFO_CACHE1_DMA_GET]);
-        uint32_t put = qatomic_read(&d->pfifo.regs[NV_PFIFO_CACHE1_DMA_PUT]);
-        hwaddr lo = surface->vram_addr;
-        hwaddr hi = lo + (hwaddr)surface->pitch * surface->height;
-        if ((get + 0x80000 > lo && get < hi + 0x80000) ||
-            (put + 0x80000 > lo && put < hi + 0x80000)) {
-            static unsigned n;
-            if (n++ < 50) {
-                fprintf(stderr, "vk-surface: write-back 0x%" HWADDR_PRIx
-                        "-0x%" HWADDR_PRIx " (%ux%u pitch %u, %s, aa %u, "
-                        "clip %u,%u %ux%u, dma 0x%" HWADDR_PRIx "+0x%"
-                        HWADDR_PRIx ") near pushbuffer get 0x%x put 0x%x\n",
-                        lo, hi, surface->width, surface->height,
-                        surface->pitch, surface->color ? "color" : "zeta",
-                        surface->shape.anti_aliasing, surface->shape.clip_x,
-                        surface->shape.clip_y, surface->shape.clip_width,
-                        surface->shape.clip_height, surface->dma_addr,
-                        surface->dma_len, get, put);
-            }
-        }
-    }
     download_surface_to_buffer(d, surface, d->vram_ptr + surface->vram_addr);
 
     memory_region_set_client_dirty(d->vram, surface->vram_addr,
