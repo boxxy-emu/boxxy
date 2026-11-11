@@ -63,6 +63,9 @@ jobs:
               automake libtool bison flex gperf curl zip unzip tar
           # Ubuntu's Meson is too old (the build needs >= 1.5).
           pipx install meson==1.10.1
+          # Meson runs the build's Python generators with its own interpreter;
+          # gen_config.py (xemu-config.h) imports yaml.
+          pipx inject meson pyyaml
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install the NDK and CMake
