@@ -12,7 +12,7 @@
   <img alt="Platform" src="https://img.shields.io/badge/platform-Android%2013%2B-3ddc84">
   <img alt="ABI" src="https://img.shields.io/badge/ABI-arm64--v8a-6cf04a">
   <img alt="License" src="https://img.shields.io/badge/license-GPL--2.0-1fdb5c">
-  <img alt="Status" src="https://img.shields.io/badge/status-work%20in%20progress-d2ff3c">
+  <a href="https://github.com/boxxy-emu/boxxy/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/boxxy-emu/boxxy?display_name=release&label=release&color=d2ff3c"></a>
 </p>
 
 ---
@@ -26,7 +26,7 @@ dual-screen devices.
 xemu runs the x86 CPU through QEMU's translator. On an x86 PC that is x86 code
 running on x86, but on a phone every instruction is translated to ARM. Most of
 the work in this fork goes into making that fast and cool-running enough to play
-on a handheld. See [Performance](#performance).
+on a handheld.
 
 > [!NOTE]
 > Boxxy is an independent project and is not affiliated with the xemu team.
@@ -34,7 +34,8 @@ on a handheld. See [Performance](#performance).
 
 ## Status
 
-Boxxy is in active development. It is developed and tested on an **AYN Thor**
+Boxxy is in active development; 1.0 is its first release. It is developed and
+tested on an **AYN Thor**
 (Snapdragon 8 Gen 2, dual screen). Other devices should work if they meet the
 requirements below, but they are untested.
 
@@ -65,6 +66,14 @@ on a desktop PC.
   own gamma ramp.
 - An optional performance overlay with frame-time graph.
 
+**Online play**
+- Xbox Live games online through [Insignia](https://insignia.live), the
+  community revival of the original service. Settings > Network > Set up
+  online play walks through it: Boxxy connects the emulated Xbox, points it at
+  Insignia's servers, installs the dashboard Insignia needs from a copy you
+  supply, and boots Insignia's registration disc. You make the account
+  yourself, with a free code from insignia.live.
+
 **Saves**
 - Save slots with thumbnails.
 - Quick Resume: leaving a game saves it, and the next launch picks up where you
@@ -76,6 +85,9 @@ on a desktop PC.
   need them.
 - Dual-screen devices: the library and the in-game menu use the second screen.
 - Frame pacing locked to the panel's real refresh rate, for judder-free output.
+- Backup and restore of everything Boxxy keeps (the Xbox hard disk, saves,
+  settings and artwork) to a folder of your choice.
+- Updates itself from this repository's releases.
 
 ## Requirements
 
@@ -91,14 +103,23 @@ on a desktop PC.
 
 ## Getting started
 
-There are no release builds yet; for now Boxxy has to be
-[built from source](#building).
-
-1. Install the APK.
+1. Download `boxxy-<version>.apk` from the
+   [latest release](https://github.com/boxxy-emu/boxxy/releases/latest) and
+   install it. Android asks you to allow installs from the app you opened it
+   with (your browser or file manager).
 2. On first launch, the setup screen asks for the MCPX boot ROM, the BIOS and
    the hard-disk image.
 3. Add a folder of game images to the library.
 4. Optionally, enter a SteamGridDB API key under Settings for artwork.
+
+Settings > About shows the version and build; please include them when you
+[report a problem](https://github.com/boxxy-emu/boxxy/issues/new/choose).
+
+### Known issues
+
+- The Microsoft dashboard used for online play (5960) can crash after a few
+  minutes sitting idle in its menus; open it again to carry on. Games are
+  not affected as far as we know.
 
 ## Building
 
@@ -129,30 +150,8 @@ cd android && ./gradlew assembleRelease
 ```
 
 The [Android workflow](.github/workflows/android.yml) runs exactly these steps
-on every push and keeps the APK as a build artifact.
-
-[`CLAUDE.md`](CLAUDE.md) documents the build in detail: the archive steps
-needed after editing core files, compiler flags that must match on both sides,
-profile-guided optimisation, and the common pitfalls.
-
-## Performance
-
-Most of this fork's changes are performance work, measured on the device. Some
-of the larger wins:
-
-- **Idle and spin-loop halting.** When the guest kernel idles, or a game spins
-  waiting on a timer, the emulated CPU now sleeps until the next interrupt. This
-  cut emulated-CPU time by about a quarter and lowered temperatures by about
-  10 °C, which keeps clocks up on a passively limited handheld.
-- **x87 floating point on native hardware**, and faster translated-code lookups.
-- **A leaner NV2A GPU thread**: batched locking, cheaper dirty checks,
-  zero-copy display, and quieter logging. Together these took its per-frame
-  time from about 19 ms to about 9 ms.
-- **Profile-guided optimisation** of the core, and an ARMv8.6-A target.
-
-[`perf-investigation/00-FINDINGS.md`](perf-investigation/00-FINDINGS.md) is the
-full record: the measurements, the method, and the ideas that were tried and
-did *not* help.
+on every push and keeps the APK as a build artifact. Pushing a `boxxy-v<version>`
+tag also signs the APK with the release key and drafts a GitHub release.
 
 ## Relationship to xemu
 

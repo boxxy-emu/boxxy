@@ -62,7 +62,8 @@ them).
 v0.x tags) and push the tag: the same workflow signs the APK with the release
 key from the repo secrets, builds it non-debuggable, checks the signer and
 that the version matches the tag, and opens a draft release with the APK,
-its `.sha256` and `update.json`. The version name and code come from git
+its `.sha256` and `update.json`; the draft's notes come from
+`release-notes/<version>.md` if it exists (the update dialog shows them). The version name and code come from git
 (`build.gradle.kts`). The key is made once by
 `android/tools/make-release-key.sh` (certificate `CN=Boxxy, O=Boxxy`, nothing
 personal; kept in `~/.android/boxxy-release.jks`, settings in

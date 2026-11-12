@@ -148,7 +148,13 @@ jobs:
           {"versionName": "$version", "versionCode": $code, "apk": "$out", "sha256": "$sha"}
           EOF
 
+          # release-notes/<version>.md when there is one; edit the draft either way.
+          notes="release-notes/$version.md"
+          if [[ ! -f "$notes" ]]; then
+            echo "Release notes for Boxxy $version go here." > "$RUNNER_TEMP/notes.md"
+            notes="$RUNNER_TEMP/notes.md"
+          fi
           gh release create "$tag" --draft --verify-tag \
               --title "Boxxy $version" \
-              --notes "Release notes for Boxxy $version go here." \
+              --notes-file "$notes" \
               "$out" "$out.sha256" update.json
