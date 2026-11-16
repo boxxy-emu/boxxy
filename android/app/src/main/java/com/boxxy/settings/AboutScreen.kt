@@ -119,7 +119,7 @@ fun AboutScreen(navController: NavController) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = { open("$REPO_URL/blob/android-port/LICENSE") }) {
+            TextButton(onClick = { open("$REPO_URL/blob/HEAD/LICENSE") }) {
                 Text("License")
             }
 
