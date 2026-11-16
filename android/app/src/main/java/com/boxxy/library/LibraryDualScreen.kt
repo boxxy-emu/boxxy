@@ -104,7 +104,7 @@ class LibraryPresentation(
                 .firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
         }
 
-        private val NAV_KEYS = setOf(
+        internal val NAV_KEYS = setOf(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,

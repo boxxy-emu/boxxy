@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -44,7 +45,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.mutableIntStateOf
@@ -53,7 +57,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import com.boxxy.settings.SettingsViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class,
+       androidx.compose.foundation.ExperimentalFoundationApi::class,
+       androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun GameLibraryScreen(
     navController: NavController,
@@ -125,11 +131,29 @@ fun GameLibraryScreen(
      * The selected game is the card with controller focus, or else the one
      * nearest the middle of the row -- so scrolling by touch moves the
      * background along with it.
+     *
+     * Where the selection shows (background art) it works like a carousel
+     * instead.  A swipe scrolls the row with the finger, and while it does
+     * the highlight follows the middle card.  A tap highlights a card (tap
+     * the highlighted one to launch), which reaches the cards at either end
+     * that never pass the middle.  The controller moves the highlight and
+     * the row scrolls to keep it in the middle, as far as the row's ends
+     * allow: from the first card at the left, to the middle, and out to the
+     * last card.  [pickedKey] is that highlight.
      */
     val gridState = rememberLazyGridState()
+    /* Set below, once known. */
+    val carouselNow = remember { mutableStateOf(false) }
+    var pickedKey by remember { mutableStateOf<String?>(null) }
+    val focusMarginPx = with(androidx.compose.ui.platform.LocalDensity.current) { 16.dp.toPx() }
+    /* A swipe is in charge of the highlight until a tap or the controller
+     * takes it back. */
+    var swiping by remember { mutableStateOf(false) }
     val favorite by libraryViewModel.favorite.collectAsState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var focusedKey by remember { mutableStateOf<String?>(null) }
+    /* The top bar's buttons or the + button have controller focus. */
+    var chromeFocused by remember { mutableStateOf(false) }
     /* On the selected card, so the controller can start where the
      * highlight is (LibraryPresentation.dispatchKeyEvent). */
     val selectedFocus = remember { FocusRequester() }
@@ -137,8 +161,9 @@ fun GameLibraryScreen(
         derivedStateOf {
             val info = gridState.layoutInfo
             /* At either end of the list the end card is the natural pick;
-             * the centre card is only right while scrolled in between. */
-            if (gridState.firstVisibleItemIndex == 0 &&
+             * the centre card is only right while scrolled in between.  (The
+             * carousel always follows the middle; taps reach the ends.) */
+            if (!carouselNow.value && gridState.firstVisibleItemIndex == 0 &&
                 gridState.firstVisibleItemScrollOffset == 0) {
                 return@derivedStateOf info.visibleItemsInfo.firstOrNull()?.key as? String
             }
@@ -153,9 +178,55 @@ fun GameLibraryScreen(
     LaunchedEffect(steamGridDbKey, games.size) {
         libraryViewModel.autoFetchArt(steamGridDbKey)
     }
-    LaunchedEffect(focusedKey, centreKey, games.size) {
-        (focusedKey ?: centreKey ?: games.firstOrNull()?.uri?.toString())
+    /* The carousel's highlight: the controller's card, else the middle card
+     * while swiping, else the last one picked. */
+    LaunchedEffect(focusedKey, centreKey, swiping) {
+        when {
+            focusedKey != null -> { pickedKey = focusedKey; swiping = false }
+            swiping && centreKey != null -> pickedKey = centreKey
+        }
+    }
+    /* First the selection from before (back from Settings or a game), and a
+     * real game if that one went away. */
+    LaunchedEffect(games) {
+        if (games.none { it.uri.toString() == pickedKey }) {
+            pickedKey = (games.firstOrNull { it.uri == libraryViewModel.selectedUri.value }
+                         ?: games.firstOrNull())?.uri?.toString()
+        }
+    }
+    LaunchedEffect(focusedKey, centreKey, pickedKey, carouselNow.value, games.size) {
+        (focusedKey ?: (if (carouselNow.value) pickedKey else centreKey)
+            ?: games.firstOrNull()?.uri?.toString())
             ?.let { libraryViewModel.select(android.net.Uri.parse(it)) }
+    }
+    /* Bring [key]'s card fully into view, if it is cut off at an edge. */
+    suspend fun revealOn(key: String) {
+        val info = gridState.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.key == key } ?: return
+        val start = item.offset.x.toFloat()
+        val end = start + item.size.width
+        val delta = when {
+            start < info.viewportStartOffset -> start - info.viewportStartOffset - focusMarginPx
+            end > info.viewportEndOffset -> end - info.viewportEndOffset + focusMarginPx
+            else -> return
+        }
+        gridState.animateScrollBy(delta,
+            androidx.compose.animation.core.tween(150))
+    }
+    /* Scroll [key]'s card to the middle, as far as the row's ends allow. */
+    suspend fun centreOn(key: String, animate: Boolean) {
+        val i = games.indexOfFirst { it.uri.toString() == key }
+        if (i < 0) return
+        var item = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
+        if (item == null) {
+            gridState.scrollToItem(i)
+            item = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key } ?: return
+        }
+        val info = gridState.layoutInfo
+        val delta = item.offset.x + item.size.width / 2f -
+                    (info.viewportStartOffset + info.viewportEndOffset) / 2f
+        if (kotlin.math.abs(delta) < 1f) return
+        if (animate) gridState.animateScrollBy(delta) else gridState.scrollBy(delta)
     }
     /* Focus scrolls a card only until its box touches the edge, which leaves
      * the highlighted card's lift and border cut off at either end of the
@@ -165,6 +236,8 @@ fun GameLibraryScreen(
         val key = focusedKey ?: return@LaunchedEffect
         androidx.compose.runtime.snapshotFlow { gridState.isScrollInProgress }
             .first { !it }
+        /* The carousel keeps the controller's card in the middle. */
+        if (carouselNow.value) { centreOn(key, animate = true); return@LaunchedEffect }
         val info = gridState.layoutInfo
         val item = info.visibleItemsInfo.firstOrNull { it.key == key } ?: return@LaunchedEffect
         val start = item.offset.x.toFloat()
@@ -180,14 +253,56 @@ fun GameLibraryScreen(
     }
 
     val activity = context as? androidx.activity.ComponentActivity
+    val rootView = androidx.compose.ui.platform.LocalView.current
     val useDual = dualDisplay != null && activity != null && games.isNotEmpty()
     val artShown = (backgroundArt || useDual) && games.isNotEmpty()
+    val carousel = artShown
+    SideEffect { carouselNow.value = carousel }
+    /* Opening on a game picked before: bring it into view, in the middle. */
+    LaunchedEffect(carousel, games.isNotEmpty()) {
+        if (!carousel || games.isEmpty()) return@LaunchedEffect
+        val key = pickedKey ?: return@LaunchedEffect
+        if (key == games.first().uri.toString()) return@LaunchedEffect
+        androidx.compose.runtime.snapshotFlow { gridState.layoutInfo.visibleItemsInfo.isNotEmpty() }
+            .first { it }
+        centreOn(key, animate = false)
+    }
 
     val cards: @Composable (Modifier) -> Unit = { mod ->
+      BoxWithConstraints(mod) {
+        /* Swiping hands the selection to the scroll position: drop the
+         * controller's card, or the next D-pad press carries on from it
+         * (often the first card) instead of from the middle. */
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+        val dragged by gridState.interactionSource.collectIsDraggedAsState()
+        LaunchedEffect(dragged) {
+            if (!dragged) return@LaunchedEffect
+            if (focusedKey != null) focusManager.clearFocus(force = true)
+            /* The highlight follows the middle card only once the row moves:
+             * a drag against either end leaves it where it is. */
+            val start = gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
+            androidx.compose.runtime.snapshotFlow {
+                gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
+            }.first { it != start }
+            swiping = true
+        }
         LazyHorizontalGrid(
             state = gridState,
             rows = GridCells.Fixed(gridRows),
-            modifier = mod,
+            modifier = Modifier.fillMaxSize()
+                .focusProperties {
+                /* Left/right past the last card stays on it: leaving the row
+                 * sideways lands on the top bar or the + button. */
+                exit = { dir ->
+                    if (dir == FocusDirection.Left || dir == FocusDirection.Right)
+                        FocusRequester.Cancel
+                    else FocusRequester.Default
+                }
+                /* Coming back down from the top bar returns to the
+                 * highlighted card, not whichever card is under the button
+                 * (in the carousel, where it is always on screen). */
+                enter = { if (carousel) selectedFocus else FocusRequester.Default }
+            },
             // Extra room on the trailing edge so the last card can scroll
             // clear of the floating action button instead of under it.
             contentPadding = PaddingValues(
@@ -216,7 +331,19 @@ fun GameLibraryScreen(
                          * the one with controller focus. */
                         highlighted = if (artShown) game.uri == selectedGame?.uri
                                       else focusedKey == game.uri.toString(),
-                        onClick = { launchGame(context, game, settingsViewModel) },
+                        /* The carousel: a tap highlights; tapping the
+                         * highlighted card launches it.  The row stays put
+                         * unless the card is cut off at the edge: a touch
+                         * while the row is still moving only stops it, so
+                         * a quick second tap would be lost. */
+                        onClick = {
+                            val key = game.uri.toString()
+                            if (carousel && game.uri != selectedGame?.uri) {
+                                swiping = false
+                                pickedKey = key
+                                scope.launch { revealOn(key) }
+                            } else launchGame(context, game, settingsViewModel)
+                        },
                         onLongClick = { artTarget = game },
                         onResume = resumeAt?.let {
                             { launchGame(context, game, settingsViewModel,
@@ -226,6 +353,25 @@ fun GameLibraryScreen(
                 }
             }
         }
+      }
+    }
+
+    /* Single screen: with no card focused (a swipe drops the focus, see
+     * cards), the first D-pad press would focus the row's first card.
+     * MainActivity hands that press to the selected card instead, unless the
+     * controller is on the top bar or the + button (the lower screen does
+     * the same in LibraryPresentation). */
+    DisposableEffect(useDual, games.isNotEmpty()) {
+        val hook: (() -> Unit)? = if (!useDual && games.isNotEmpty()) {
+            {
+                if (focusedKey == null && !chromeFocused) {
+                    rootView.requestFocusFromTouch()
+                    try { selectedFocus.requestFocus() } catch (_: IllegalStateException) {}
+                }
+            }
+        } else null
+        LibraryFocus.focusSelected = hook
+        onDispose { if (LibraryFocus.focusSelected === hook) LibraryFocus.focusSelected = null }
     }
 
     /* Dual screen: the cards go to the lower screen's window. */
@@ -278,7 +424,6 @@ fun GameLibraryScreen(
      * whenever the library comes to the front, on either screen.  Touching
      * the screen puts it back in touch mode, and then -- as everywhere in
      * Android -- the first D-pad press brings the focus back. */
-    val rootView = androidx.compose.ui.platform.LocalView.current
     LaunchedEffect(started, useDual, games.isNotEmpty()) {
         if (!started || games.isEmpty() || !gamepadConnected()) return@LaunchedEffect
         kotlinx.coroutines.delay(150)          // the list (and lower window) laid out
@@ -305,6 +450,7 @@ fun GameLibraryScreen(
         else MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                modifier = Modifier.onFocusChanged { chromeFocused = it.hasFocus },
                 colors = if (artShown)
                     TopAppBarDefaults.topAppBarColors(
                         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -348,7 +494,8 @@ fun GameLibraryScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { dirPicker.launch(null) }) {
+            FloatingActionButton(onClick = { dirPicker.launch(null) },
+                                 modifier = Modifier.onFocusChanged { chromeFocused = it.hasFocus }) {
                 Icon(Icons.Default.Add, contentDescription = "Add games folder")
             }
         }
@@ -416,7 +563,11 @@ fun GameLibraryScreen(
                 libraryViewModel.setFavorite(
                     if (favorite == game.uri.toString()) null else game.uri)
                 /* Show where it went: the favorite is now first. */
-                scope.launch { gridState.animateScrollToItem(0) }
+                scope.launch {
+                    swiping = false
+                    pickedKey = games.firstOrNull()?.uri?.toString()
+                    gridState.animateScrollToItem(0)
+                }
             },
             onChoose = { artPicker.launch(arrayOf("image/*")) },
             onReset = {
@@ -544,3 +695,10 @@ private fun gamepadConnected(): Boolean =
             d.sources and android.view.InputDevice.SOURCE_GAMEPAD ==
                 android.view.InputDevice.SOURCE_GAMEPAD
     }
+
+/** The single-screen library's hook for a controller press while no card has
+ *  focus (MainActivity.dispatchKeyEvent): it focuses the highlighted card
+ *  first.  Null when the library isn't showing or is on the lower screen. */
+object LibraryFocus {
+    var focusSelected: (() -> Unit)? = null
+}

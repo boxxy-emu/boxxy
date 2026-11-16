@@ -128,6 +128,12 @@ class MainActivity : ComponentActivity() {
      * to DPAD_CENTER only comes after an unhandled A. */
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
         if (com.boxxy.library.LibraryPresentation.forwardKey(event)) return true
+        /* Single-screen library: with no card focused (after a swipe), the
+         * first press starts from the highlighted card, not the row's first. */
+        if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+            event.keyCode in com.boxxy.library.LibraryPresentation.NAV_KEYS) {
+            com.boxxy.library.LibraryFocus.focusSelected?.invoke()
+        }
         if (event.keyCode == android.view.KeyEvent.KEYCODE_BUTTON_A) {
             return super.dispatchKeyEvent(android.view.KeyEvent(
                 event.downTime, event.eventTime, event.action,
